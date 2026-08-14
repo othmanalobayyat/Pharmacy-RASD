@@ -1,0 +1,61 @@
+// ---------- app-wide constants ----------
+
+export const DEFAULT_LABELS = {
+  appTitle: "Pharmacy RASD",
+  appSubtitle:
+    "صيدلية العيادة المتنقلة — متابعة الأدوية والدفعات وتواريخ الانتهاء",
+  tabMeds: "الأدوية",
+  tabFirstAid: "الإسعافات الأولية",
+  tabLog: "سجلّ الصرف",
+  kpiExpired: "منتهية الصلاحية",
+  kpiCritical: "أقل من شهر",
+  kpiLowFirstAid: "إسعافات ناقصة",
+  kpiMedCount: "نوع دواء مسجّل",
+  sidebarAll: "كل الأدوية",
+  addCategoryBtn: "فئة جديدة",
+  addMedBtn: "إضافة دواء",
+  searchPlaceholder: "ابحث عن دواء…",
+  sessionLabel: "تاريخ اليوم اللي بتسجّل فيه الصرف:",
+  sessionHint: "حدده مرة وكل ضغطة سحب تحته بتستخدم نفس التاريخ",
+  addBatchBtn: "دفعة جديدة",
+  withdrawCustomBtn: "صرف مخصّص",
+  remainingUnitLabel: "وحدة متبقية",
+  firstAidIntro: "مواد الإسعافات الأولية المتوفرة في العيادة",
+  addFirstAidBtn: "إضافة مادة",
+  logTitle: "سجلّ عمليات الصرف من الرفوف (كل الأدوية)",
+  emptyMedsTitle: "لا يوجد أدوية مسجّلة بعد",
+  emptyMedsSubtitle: "ابدأ بإضافة أول دواء لهذه الفئة أو للصيدلية عمومًا.",
+};
+
+export const LABEL_META = [
+  ["appTitle", "اسم التطبيق"],
+  ["appSubtitle", "الوصف تحت الاسم"],
+  ["tabMeds", "تبويب: الأدوية"],
+  ["tabFirstAid", "تبويب: الإسعافات الأولية"],
+  ["tabLog", "تبويب: سجلّ الصرف"],
+  ["kpiExpired", "مؤشر: منتهية الصلاحية"],
+  ["kpiCritical", "مؤشر: أقل من شهر"],
+  ["kpiLowFirstAid", "مؤشر: إسعافات ناقصة"],
+  ["kpiMedCount", "مؤشر: عدد الأدوية"],
+  ["sidebarAll", "زر: كل الأدوية"],
+  ["addCategoryBtn", "زر: فئة جديدة"],
+  ["addMedBtn", "زر: إضافة دواء"],
+  ["searchPlaceholder", "نص البحث"],
+  ["sessionLabel", "عنوان شريط التاريخ"],
+  ["sessionHint", "تلميح شريط التاريخ"],
+  ["addBatchBtn", "زر: دفعة جديدة"],
+  ["withdrawCustomBtn", "زر: صرف مخصّص"],
+  ["remainingUnitLabel", "نص: وحدة متبقية"],
+  ["firstAidIntro", "مقدمة قسم الإسعافات"],
+  ["addFirstAidBtn", "زر: إضافة مادة إسعاف"],
+  ["logTitle", "عنوان قسم السجلّ"],
+  ["emptyMedsTitle", "عنوان حالة الفراغ"],
+  ["emptyMedsSubtitle", "وصف حالة الفراغ"],
+];
+
+export const URGENCY_STYLE = {
+  expired: { bg: "#FBE7E4", fg: "#9A2E23", bar: "#C4453B" },
+  critical: { bg: "#FBEEDD", fg: "#8A5417", bar: "#D98A3D" },
+  warning: { bg: "#FFF7DE", fg: "#7A6416", bar: "#E0B23D" },
+  ok: { bg: "#E7F3F1", fg: "#145C5C", bar: "#2E8B8B" },
+};

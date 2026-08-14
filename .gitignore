@@ -1,0 +1,54 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+build
+*.local
+
+# Test coverage
+coverage
+
+# Environment variables — never commit real credentials
+.env
+.env.local
+.env.*.local
+.env.*
+!.env.example
+
+# Supabase CLI local state — supabase/.temp/pooler-url contains a live
+# database connection string with credentials; supabase/.temp in general is
+# machine-local CLI cache, not project source. supabase/config.toml (outside
+# .temp) IS meant to be committed.
+supabase/.temp/
+.supabase-token
+
+# Local Claude Code tool settings (per-developer, not project config)
+.claude/settings.local.json
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.swp
+*.swo
+*.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.suo
+*.ntvs*
+*.njsproj
+*.sln

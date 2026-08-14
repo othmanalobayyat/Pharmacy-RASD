@@ -1,0 +1,36 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+input:focus,
+select:focus,
+button:focus-visible {
+  outline: 2px solid #2e8b8b;
+  outline-offset: 1px;
+}
+::placeholder {
+  color: #a7b8b6;
+}
+
+@media (max-width: 760px) {
+  .pharmacy-body {
+    flex-direction: column !important;
+  }
+  .pharmacy-sidebar {
+    width: 100% !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .pharmacy-sidebar > button,
+  .pharmacy-sidebar > div {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .pharmacy-main {
+    width: 100% !important;
+  }
+}
