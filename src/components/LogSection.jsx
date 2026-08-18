@@ -3,7 +3,14 @@ import { styles } from "../styles/styles";
 import { formatMonthYear } from "../lib/dates";
 import { EmptyState } from "./EmptyState";
 
-export function LogSection({ L, log }) {
+export function LogSection({
+  L,
+  log,
+  hasMore,
+  loadingMore,
+  loadMoreError,
+  onLoadMore,
+}) {
   return (
     <main className="pharmacy-main" style={{ ...styles.main, width: "100%" }}>
       <div style={styles.toolbar}>
@@ -50,6 +57,36 @@ export function LogSection({ L, log }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {log.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 14,
+          }}
+        >
+          {loadMoreError && (
+            <div style={{ color: "#9A2E23", fontSize: 12.5, textAlign: "center" }}>
+              {loadMoreError}
+            </div>
+          )}
+          {hasMore ? (
+            <button
+              style={{ ...styles.secondaryBtn, flex: "none" }}
+              onClick={onLoadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? "جارٍ التحميل…" : loadMoreError ? "إعادة المحاولة" : "تحميل المزيد"}
+            </button>
+          ) : (
+            <div style={{ color: "#B7C7C5", fontSize: 12 }}>
+              لا يوجد المزيد من السجلات
+            </div>
+          )}
         </div>
       )}
     </main>

@@ -6,6 +6,7 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 // must be created inside vi.hoisted().
 const mockApi = vi.hoisted(() => ({
   fetchClinicData: vi.fn(),
+  fetchWithdrawalLogPage: vi.fn(),
   subscribeToClinicData: vi.fn(() => () => {}),
 }));
 
@@ -78,5 +79,92 @@ describe("usePharmacyData — loading/success/empty/error must all be distinguis
 
     expect(result.current.loadError).toBe("");
     expect(result.current.state.categories).toHaveLength(1);
+  });
+});
+
+describe("usePharmacyData — withdrawal-log pagination (Improvement #7)", () => {
+  const logRow = (i) => ({ id: `log-${i}`, medId: "med-1", qty: 1, date: "2026-08-01" });
+
+  it("exposes logHasMore from the initial page load", async () => {
+    mockApi.fetchClinicData.mockResolvedValue({
+      ...emptyDataset,
+      log: [logRow(1)],
+      logHasMore: true,
+    });
+    const { result } = renderHook(() => usePharmacyData("clinic-1"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.logHasMore).toBe(true);
+    expect(result.current.state.log).toEqual([logRow(1)]);
+  });
+
+  it("loadMoreLog() appends older rows to the existing list rather than replacing it", async () => {
+    mockApi.fetchClinicData.mockResolvedValue({
+      ...emptyDataset,
+      log: [logRow(1), logRow(2)],
+      logHasMore: true,
+    });
+    mockApi.fetchWithdrawalLogPage.mockResolvedValue({
+      logs: [logRow(3), logRow(4)],
+      hasMore: false,
+    });
+
+    const { result } = renderHook(() => usePharmacyData("clinic-1"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.loadMoreLog();
+    });
+
+    // fetched starting exactly where the already-loaded list left off
+    expect(mockApi.fetchWithdrawalLogPage).toHaveBeenCalledWith(2);
+    // existing rows are still first (newest-first order preserved), new
+    // (older) rows appended after them
+    expect(result.current.state.log).toEqual([
+      logRow(1),
+      logRow(2),
+      logRow(3),
+      logRow(4),
+    ]);
+    expect(result.current.logHasMore).toBe(false);
+  });
+
+  it("a failed loadMoreLog() surfaces a safe error without discarding already-loaded rows", async () => {
+    mockApi.fetchClinicData.mockResolvedValue({
+      ...emptyDataset,
+      log: [logRow(1)],
+      logHasMore: true,
+    });
+    mockApi.fetchWithdrawalLogPage.mockRejectedValue(
+      new Error("⚠️ تعذر الاتصال بالنظام. تحقق من اتصال الإنترنت وحاول مرة أخرى."),
+    );
+
+    const { result } = renderHook(() => usePharmacyData("clinic-1"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.loadMoreLog();
+    });
+
+    expect(result.current.logMoreError).toBe(
+      "⚠️ تعذر الاتصال بالنظام. تحقق من اتصال الإنترنت وحاول مرة أخرى.",
+    );
+    expect(result.current.state.log).toEqual([logRow(1)]);
+  });
+
+  it("loadMoreLog() is a no-op once there are no more records", async () => {
+    mockApi.fetchClinicData.mockResolvedValue({
+      ...emptyDataset,
+      log: [logRow(1)],
+      logHasMore: false,
+    });
+    const { result } = renderHook(() => usePharmacyData("clinic-1"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.loadMoreLog();
+    });
+
+    expect(mockApi.fetchWithdrawalLogPage).not.toHaveBeenCalled();
   });
 });

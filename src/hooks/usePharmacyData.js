@@ -22,14 +22,36 @@ export function usePharmacyData(clinicId) {
   const [cloudStatus, setCloudStatus] = useState("idle"); // idle | saving | error
   const [error, setError] = useState("");
 
+  // Global withdrawal-log pagination (Improvement #7). `state.log` only ever
+  // holds the currently-loaded window (first page, plus whatever "Load more"
+  // has appended) — never the whole table.
+  const [logHasMore, setLogHasMore] = useState(false);
+  const [loadingMoreLog, setLoadingMoreLog] = useState(false);
+  const [logMoreError, setLogMoreError] = useState("");
+  // Bumped on every successful loadInitial/refetch so MedHistory (which
+  // fetches its own per-medication log directly from the DB, not from
+  // state.log) knows to re-fetch and stay live-synced with Realtime, without
+  // this hook having to hold a second copy of per-medication history.
+  const [logRefreshTick, setLogRefreshTick] = useState(0);
+
   const refetchTimerRef = useRef(null);
   const mountedRef = useRef(true);
+  const stateRef = useRef(null);
+  stateRef.current = state;
 
   const refetch = useCallback(async () => {
     if (!clinicId) return;
     try {
-      const next = await api.fetchClinicData();
-      if (mountedRef.current) setState(next);
+      // Re-request the same-sized log window already loaded (e.g. after
+      // "Load more"), so an unrelated change elsewhere doesn't collapse an
+      // expanded log view back down to just the first page.
+      const currentLogLength = stateRef.current?.log?.length;
+      const next = await api.fetchClinicData(currentLogLength || undefined);
+      if (mountedRef.current) {
+        setState(next);
+        setLogHasMore(next.logHasMore);
+        setLogRefreshTick((t) => t + 1);
+      }
     } catch (e) {
       if (mountedRef.current) setError(e.message);
     }
@@ -44,7 +66,11 @@ export function usePharmacyData(clinicId) {
     setLoadError("");
     try {
       const data = await api.fetchClinicData();
-      if (mountedRef.current) setState(data);
+      if (mountedRef.current) {
+        setState(data);
+        setLogHasMore(data.logHasMore);
+        setLogRefreshTick((t) => t + 1);
+      }
     } catch (e) {
       if (mountedRef.current) {
         setLoadError(e.message || "تعذر تحميل بيانات الصيدلية");
@@ -54,12 +80,34 @@ export function usePharmacyData(clinicId) {
     }
   }, [clinicId]);
 
+  // "تحميل المزيد" — appends the next page of older withdrawal-log rows to
+  // the ones already loaded; never replaces or re-slices what's there.
+  const loadMoreLog = useCallback(async () => {
+    if (!clinicId || loadingMoreLog || !logHasMore) return;
+    setLoadingMoreLog(true);
+    setLogMoreError("");
+    try {
+      const offset = stateRef.current?.log?.length || 0;
+      const { logs, hasMore } = await api.fetchWithdrawalLogPage(offset);
+      if (mountedRef.current) {
+        setState((prev) => (prev ? { ...prev, log: [...prev.log, ...logs] } : prev));
+        setLogHasMore(hasMore);
+      }
+    } catch (e) {
+      if (mountedRef.current) setLogMoreError(e.message);
+    } finally {
+      if (mountedRef.current) setLoadingMoreLog(false);
+    }
+  }, [clinicId, loadingMoreLog, logHasMore]);
+
   useEffect(() => {
     mountedRef.current = true;
     if (!clinicId) {
       setState(null);
       setLoading(false);
       setLoadError("");
+      setLogHasMore(false);
+      setLogMoreError("");
       return () => {
         mountedRef.current = false;
       };
@@ -180,6 +228,11 @@ export function usePharmacyData(clinicId) {
     cloudStatus,
     error,
     refetch,
+    logHasMore,
+    loadingMoreLog,
+    logMoreError,
+    loadMoreLog,
+    logRefreshTick,
     addCategory,
     editCategory,
     addMedication,

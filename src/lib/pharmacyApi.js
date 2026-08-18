@@ -72,9 +72,52 @@ const mapProfile = (r) => ({
   createdAt: r.created_at,
 });
 
+// ---------- withdrawal log pagination ----------
+// Global withdrawal history can grow into the thousands, so it is loaded a
+// page at a time (limit/offset — see fetchWithdrawalLogPage below) instead
+// of all at once. logLimit here is only "how large is the FIRST page" — see
+// supabase/migrations/0011_paginate_withdrawal_logs_index.sql for the index
+// that keeps this query efficient at any offset.
+export const LOG_PAGE_SIZE = 50;
+
+// Fetches one page of the clinic's global withdrawal history, newest first.
+// Requests `limit + 1` rows (not a separate count query) purely to learn
+// whether a further page exists, matching the "don't fetch everything just
+// to know if there's more" requirement.
+export async function fetchWithdrawalLogPage(offset, limit = LOG_PAGE_SIZE) {
+  const rows = await unwrap(
+    supabase
+      .from("withdrawal_logs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit),
+  );
+  return { logs: rows.slice(0, limit).map(mapLog), hasMore: rows.length > limit };
+}
+
+// A single medication's withdrawal history, queried directly from the
+// database (not filtered client-side out of the paginated global log — the
+// global log only ever holds the currently-loaded page, so filtering it
+// would silently drop older withdrawals of a given medication). One
+// medication's own history is inherently bounded, so it is not paginated.
+export async function fetchMedicationLog(medicationId) {
+  const rows = await unwrap(
+    supabase
+      .from("withdrawal_logs")
+      .select("*")
+      .eq("medication_id", medicationId)
+      .order("created_at", { ascending: false }),
+  );
+  return rows.map(mapLog);
+}
+
 // ---------- full dataset load ----------
-export async function fetchClinicData() {
-  const [categories, medicationRows, batches, firstAid, log, labelRows] = await Promise.all([
+// logLimit lets a refetch (after a mutation, or a realtime-triggered
+// refresh) re-request the same-sized log window the caller already had
+// loaded (e.g. after "Load more" was used), instead of collapsing it back
+// down to just the first page every time something else changes.
+export async function fetchClinicData(logLimit = LOG_PAGE_SIZE) {
+  const [categories, medicationRows, batches, firstAid, logPage, labelRows] = await Promise.all([
     unwrap(
       supabase.from("categories").select("*").order("created_at", { ascending: true }),
       "category",
@@ -88,16 +131,21 @@ export async function fetchClinicData() {
       supabase.from("first_aid_items").select("*").order("created_at", { ascending: true }),
       "firstAid",
     ).then((rows) => rows.map(mapFirstAid)),
-    unwrap(
-      supabase.from("withdrawal_logs").select("*").order("created_at", { ascending: false }),
-    ).then((rows) => rows.map(mapLog)),
+    fetchWithdrawalLogPage(0, logLimit),
     unwrap(supabase.from("ui_labels").select("*")),
   ]);
 
   const medications = medicationRows.map((r) => mapMedication(r, batches));
   const uiLabels = Object.fromEntries(labelRows.map((r) => [r.key, r.value]));
 
-  return { categories, medications, firstAid, log, uiLabels };
+  return {
+    categories,
+    medications,
+    firstAid,
+    log: logPage.logs,
+    logHasMore: logPage.hasMore,
+    uiLabels,
+  };
 }
 
 // ---------- categories ----------

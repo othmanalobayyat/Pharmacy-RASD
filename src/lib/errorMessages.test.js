@@ -87,6 +87,24 @@ describe("toUserMessage() — session/auth errors", () => {
   });
 });
 
+describe("toUserMessage() — last-admin protection (P0003)", () => {
+  it("maps the database's last-admin rejection to the exact safe Arabic message, not the generic fallback", () => {
+    const msg = toUserMessage({
+      code: "P0003",
+      message: "لا يمكن إزالة صلاحية المسؤول عن آخر مسؤول في الصيدلية",
+    });
+    expect(msg).toBe("⚠️ لا يمكن إزالة صلاحية المسؤول عن آخر مسؤول في الصيدلية");
+    expect(msg).not.toBe(
+      "⚠️ حدث خطأ غير متوقع. حاول مرة أخرى، وإذا استمرت المشكلة تواصل مع الدعم الفني.",
+    );
+  });
+
+  it("still maps correctly by CODE_MESSAGES[P0003] even if the raised text were ever non-Arabic (defense-in-depth)", () => {
+    const msg = toUserMessage({ code: "P0003", message: "last admin cannot be demoted" });
+    expect(msg).toBe("⚠️ لا يمكن إزالة صلاحية المسؤول عن آخر مسؤول في الصيدلية.");
+  });
+});
+
 describe("toUserMessage() — unknown/unrecognized errors", () => {
   it("falls back to one safe generic message for anything unrecognized", () => {
     const msg = toUserMessage({ message: "some completely novel failure xyz123" });

@@ -39,6 +39,12 @@ const CODE_MESSAGES = {
   "22003": "الكمية المطلوبة غير متوفرة في المخزون.",
   "22023": "البيانات المدخلة غير صحيحة، يرجى التحقق والمحاولة مرة أخرى.",
   P0002: "لم يتم العثور على العنصر المطلوب. قد يكون تم حذفه من جهاز آخر.",
+  // set_user_role() (supabase/migrations/0013_protect_last_admin_advisory_lock.sql,
+  // superseding 0012) raises this when asked to demote a clinic's last
+  // remaining admin. It already raises the message in Arabic, so the
+  // hasArabic() passthrough above handles it in practice — this entry is
+  // just explicit documentation/defense-in-depth in case that ever changes.
+  P0003: "لا يمكن إزالة صلاحية المسؤول عن آخر مسؤول في الصيدلية.",
 };
 
 // Fallback for when there's no SQLSTATE at all (network failures, GoTrue

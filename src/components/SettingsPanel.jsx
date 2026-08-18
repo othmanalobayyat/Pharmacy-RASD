@@ -15,6 +15,13 @@ function TeamSection({ currentUserId }) {
       .catch((e) => setError(e.message));
   }, []);
 
+  // UX convenience only — the real, race-safe boundary is enforced in the
+  // set_user_role() database function itself (see
+  // supabase/migrations/0012_protect_last_admin.sql). This just avoids an
+  // avoidable round-trip/error for the common case of one admin viewing
+  // their own team list.
+  const adminCount = (profiles || []).filter((p) => p.role === "admin").length;
+
   const toggleRole = async (p) => {
     const nextRole = p.role === "admin" ? "staff" : "admin";
     setBusyId(p.id);
@@ -62,11 +69,17 @@ function TeamSection({ currentUserId }) {
               <button
                 style={{ ...styles.secondaryBtn, flex: "none" }}
                 onClick={() => toggleRole(p)}
-                disabled={busyId === p.id || p.id === currentUserId}
+                disabled={
+                  busyId === p.id ||
+                  p.id === currentUserId ||
+                  (p.role === "admin" && adminCount <= 1)
+                }
                 title={
                   p.id === currentUserId
                     ? "لا يمكنك تغيير صلاحيتك الخاصة"
-                    : "تبديل الصلاحية"
+                    : p.role === "admin" && adminCount <= 1
+                      ? "لا يمكن إزالة صلاحية المسؤول عن آخر مسؤول في الصيدلية"
+                      : "تبديل الصلاحية"
                 }
               >
                 {p.role === "admin" ? "مسؤول" : "موظف"}

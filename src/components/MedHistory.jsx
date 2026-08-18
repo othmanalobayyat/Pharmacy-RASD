@@ -1,18 +1,67 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { styles } from "../styles/styles";
 import { URGENCY_STYLE } from "../constants";
 import { daysAgoLabel, formatMonthYear, todayISO } from "../lib/dates";
 import { medAvailableQty, medExpiredQty } from "../lib/medications";
+import { fetchMedicationLog } from "../lib/pharmacyApi";
 
-export function MedHistory({ med, log }) {
+// This medication's own withdrawal history is fetched directly from the
+// database, not filtered out of the app's global withdrawal-log state — that
+// global log is paginated (Improvement #7) and normally only holds its most
+// recent page, so filtering it here would silently make older withdrawals
+// of THIS medication disappear from its own history. `refreshSignal`
+// (bumped by usePharmacyData on every load/refetch, including realtime
+// updates) re-triggers this fetch so the view stays live while open.
+export function MedHistory({ med, refreshSignal }) {
   const [range, setRange] = useState("7");
+  const [medLog, setMedLog] = useState(null);
+  const [logError, setLogError] = useState("");
+
+  const loadLog = useCallback(() => {
+    setLogError("");
+    fetchMedicationLog(med.id)
+      .then(setMedLog)
+      .catch((e) => setLogError(e.message));
+  }, [med.id]);
+
+  useEffect(() => {
+    loadLog();
+  }, [loadLog, refreshSignal]);
+
   // "المتبقي الآن" means currently withdrawable, not raw physical stock —
   // same rule as MedCard (see lib/medications.js medAvailableQty).
   const available = medAvailableQty(med);
   const expired = medExpiredQty(med);
-  const medLog = log
-    .filter((l) => l.medId === med.id)
-    .sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  if (logError) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 10,
+          padding: "20px 4px",
+        }}
+      >
+        <div style={{ color: "#9A2E23", fontSize: 13, textAlign: "center" }}>
+          {logError}
+        </div>
+        <button style={styles.primaryBtn} onClick={loadLog}>
+          إعادة المحاولة
+        </button>
+      </div>
+    );
+  }
+
+  if (medLog === null) {
+    return (
+      <div style={{ color: "#7C918F", fontSize: 13, padding: "20px 4px", textAlign: "center" }}>
+        جارٍ التحميل…
+      </div>
+    );
+  }
+
   const cutoff = (() => {
     if (range === "all") return null;
     const d = new Date(todayISO());

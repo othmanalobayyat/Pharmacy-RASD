@@ -124,6 +124,11 @@ export default function PharmacyApp() {
     adjustFirstAid,
     deleteFirstAid,
     saveUiLabels,
+    logHasMore,
+    loadingMoreLog,
+    logMoreError,
+    loadMoreLog,
+    logRefreshTick,
   } = usePharmacyData(clinicId);
 
   const [activeTab, setActiveTab] = useState("meds");
@@ -466,7 +471,16 @@ export default function PharmacyApp() {
         />
       )}
 
-      {activeTab === "log" && <LogSection L={L} log={state.log} />}
+      {activeTab === "log" && (
+        <LogSection
+          L={L}
+          log={state.log}
+          hasMore={logHasMore}
+          loadingMore={loadingMoreLog}
+          loadMoreError={logMoreError}
+          onLoadMore={loadMoreLog}
+        />
+      )}
 
       {showSettings && isOwner && (
         <Modal title="الإعدادات" onClose={() => setShowSettings(false)} wide>
@@ -601,7 +615,7 @@ export default function PharmacyApp() {
               state.medications.find((m) => m.id === historyModalMed.id) ||
               historyModalMed
             }
-            log={state.log}
+            refreshSignal={logRefreshTick}
           />
         </Modal>
       )}

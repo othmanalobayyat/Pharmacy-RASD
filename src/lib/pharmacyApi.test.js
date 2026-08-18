@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // must itself be created inside vi.hoisted().
 const { mockSupabase, chain, setChainResult, setRpcResult } = vi.hoisted(() => {
   const chainObj = { data: null, error: null };
-  for (const method of ["insert", "update", "delete", "select", "eq", "order", "single", "maybeSingle", "upsert"]) {
+  for (const method of ["insert", "update", "delete", "select", "eq", "order", "single", "maybeSingle", "upsert", "range"]) {
     chainObj[method] = vi.fn(() => chainObj);
   }
   const supabase = {
@@ -245,5 +245,136 @@ describe("deleteCategory() / deleteMedication() / deleteBatch() — errors are m
     await expect(api.deleteMedication("med-1")).rejects.toThrow(
       "⚠️ تعذر الاتصال بالنظام. تحقق من اتصال الإنترنت وحاول مرة أخرى.",
     );
+  });
+});
+
+describe("fetchWithdrawalLogPage() — the withdrawal log is paginated at the DB level", () => {
+  const row = (i) => ({
+    id: `log-${i}`,
+    medication_id: "med-1",
+    med_name: "بنادول",
+    batch_id: "batch-1",
+    expiry: "2026-01-01",
+    qty: 1,
+    withdrawn_on: "2026-08-14",
+    performed_by_email: "staff@clinic.test",
+  });
+
+  it("queries withdrawal_logs newest-first with a real range() call, never the whole table", async () => {
+    setChainResult(Array.from({ length: 5 }, (_, i) => row(i)));
+
+    await api.fetchWithdrawalLogPage(0, 50);
+
+    expect(mockSupabase.from).toHaveBeenCalledWith("withdrawal_logs");
+    expect(chain.order).toHaveBeenCalledWith("created_at", { ascending: false });
+    // requests limit+1 rows (0..50 inclusive = 51 rows) — enough to detect
+    // "is there another page", never the full table
+    expect(chain.range).toHaveBeenCalledWith(0, 50);
+  });
+
+  it("reports hasMore=true and trims the extra probe row when a further page exists", async () => {
+    // 51 rows returned for a page size of 50 -> exactly one more than requested
+    setChainResult(Array.from({ length: 51 }, (_, i) => row(i)));
+
+    const { logs, hasMore } = await api.fetchWithdrawalLogPage(0, 50);
+
+    expect(logs).toHaveLength(50);
+    expect(hasMore).toBe(true);
+  });
+
+  it("reports hasMore=false when fewer rows than the page size come back", async () => {
+    setChainResult(Array.from({ length: 12 }, (_, i) => row(i)));
+
+    const { logs, hasMore } = await api.fetchWithdrawalLogPage(0, 50);
+
+    expect(logs).toHaveLength(12);
+    expect(hasMore).toBe(false);
+  });
+
+  it("a subsequent page request uses the given offset, not offset 0", async () => {
+    setChainResult([]);
+    await api.fetchWithdrawalLogPage(50, 50);
+    expect(chain.range).toHaveBeenCalledWith(50, 100);
+  });
+
+  it("fetchClinicData() only loads the FIRST page of the log by default, not the whole history", async () => {
+    setChainResult([]); // shared chain result used by every parallel call in fetchClinicData
+
+    await api.fetchClinicData();
+
+    // the log-page call is one of several parallel from() calls; assert the
+    // withdrawal_logs range specifically requested a bounded page
+    expect(chain.range).toHaveBeenCalledWith(0, api.LOG_PAGE_SIZE);
+  });
+
+  it("a refetch can be asked to re-request a larger already-loaded window (e.g. after Load more)", async () => {
+    setChainResult([]);
+    await api.fetchClinicData(150);
+    expect(chain.range).toHaveBeenCalledWith(0, 150);
+  });
+});
+
+describe("fetchMedicationLog() — a medication's own history is queried directly, not sliced from a cached page", () => {
+  it("filters by medication_id at the database level and maps every row", async () => {
+    setChainResult([
+      {
+        id: "log-1",
+        medication_id: "med-1",
+        med_name: "بنادول",
+        batch_id: "batch-1",
+        expiry: "2026-01-01",
+        qty: 3,
+        withdrawn_on: "2026-08-01",
+        performed_by_email: "staff@clinic.test",
+      },
+    ]);
+
+    const result = await api.fetchMedicationLog("med-1");
+
+    expect(mockSupabase.from).toHaveBeenCalledWith("withdrawal_logs");
+    expect(chain.eq).toHaveBeenCalledWith("medication_id", "med-1");
+    expect(chain.order).toHaveBeenCalledWith("created_at", { ascending: false });
+    expect(result).toEqual([
+      {
+        id: "log-1",
+        medId: "med-1",
+        medName: "بنادول",
+        batchId: "batch-1",
+        expiry: "2026-01-01",
+        qty: 3,
+        date: "2026-08-01",
+        performedByEmail: "staff@clinic.test",
+      },
+    ]);
+  });
+
+  it("a failure fetching a medication's log is mapped, not a raw Postgres error", async () => {
+    setChainResult(null, { message: "could not connect to server", code: undefined });
+    const err = await api.fetchMedicationLog("med-1").catch((e) => e);
+    expect(err.message).toBe(
+      "⚠️ حدث خطأ غير متوقع. حاول مرة أخرى، وإذا استمرت المشكلة تواصل مع الدعم الفني.",
+    );
+  });
+});
+
+describe("setUserRole() — last-admin protection (0012_protect_last_admin.sql)", () => {
+  it("a normal role change is passed straight through", async () => {
+    setRpcResult({ id: "u-1", email: "a@b.com", role: "staff", created_at: "2026-01-01" });
+    const profile = await api.setUserRole("u-1", "staff");
+    expect(mockSupabase.rpc).toHaveBeenCalledWith("set_user_role", {
+      p_user_id: "u-1",
+      p_role: "staff",
+    });
+    expect(profile.role).toBe("staff");
+  });
+
+  it("the database's last-admin rejection (already Arabic, code P0003) reaches the caller as the exact safe message", async () => {
+    setRpcResult(null, {
+      code: "P0003",
+      message: "لا يمكن إزالة صلاحية المسؤول عن آخر مسؤول في الصيدلية",
+    });
+    const err = await api.setUserRole("only-admin", "staff").catch((e) => e);
+    expect(err.message).toBe("⚠️ لا يمكن إزالة صلاحية المسؤول عن آخر مسؤول في الصيدلية");
+    expect(err.message).not.toMatch(/sql|postgres|rpc|sqlstate/i);
   });
 });
