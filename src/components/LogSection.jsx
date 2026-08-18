@@ -1,5 +1,6 @@
 import { History } from "lucide-react";
 import { styles } from "../styles/styles";
+import { formatMonthYear } from "../lib/dates";
 import { EmptyState } from "./EmptyState";
 
 export function LogSection({ L, log }) {
@@ -41,7 +42,7 @@ export function LogSection({ L, log }) {
                   <td style={styles.td}>{l.date}</td>
                   <td style={{ ...styles.td, fontWeight: 600 }}>{l.medName}</td>
                   <td style={styles.td}>{l.qty}</td>
-                  <td style={styles.td}>{l.expiry}</td>
+                  <td style={styles.td}>{l.expiry ? formatMonthYear(l.expiry) : "—"}</td>
                   <td style={{ ...styles.td, color: "#7C918F" }}>
                     {l.performedByEmail || "—"}
                   </td>

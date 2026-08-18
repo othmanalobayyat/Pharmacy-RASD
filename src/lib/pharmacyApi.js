@@ -11,11 +11,19 @@
 
 import { supabase } from "./supabase";
 
-function unwrap({ data, error }) {
+const UNIQUE_VIOLATION = "23505"; // Postgres SQLSTATE for a unique-index/constraint conflict
+
+// `duplicateMessage` is optional and used only by the name-uniqueness call
+// sites below — this is a narrow, targeted mapping for that one specific
+// error case, not a general "translate every Supabase error" layer.
+function unwrap({ data, error }, duplicateMessage) {
   if (error) {
     // Full detail for developers in the console; callers show a generic,
     // user-safe message so we never surface raw Postgres/RLS internals.
     console.error("[pharmacyApi]", error);
+    if (duplicateMessage && error.code === UNIQUE_VIOLATION) {
+      throw new Error(duplicateMessage);
+    }
     throw new Error(error.message || "حصل خطأ غير متوقع أثناء التواصل مع الخادم");
   }
   return data;
@@ -84,6 +92,8 @@ export async function fetchClinicData() {
 }
 
 // ---------- categories ----------
+const DUPLICATE_CATEGORY_MESSAGE = "يوجد بالفعل فئة بهذا الاسم";
+
 export async function createCategory(clinicId, name) {
   const row = unwrap(
     await supabase
@@ -91,6 +101,7 @@ export async function createCategory(clinicId, name) {
       .insert({ clinic_id: clinicId, name })
       .select()
       .single(),
+    DUPLICATE_CATEGORY_MESSAGE,
   );
   return mapCategory(row);
 }
@@ -98,6 +109,7 @@ export async function createCategory(clinicId, name) {
 export async function updateCategory(id, name) {
   const row = unwrap(
     await supabase.from("categories").update({ name }).eq("id", id).select().single(),
+    DUPLICATE_CATEGORY_MESSAGE,
   );
   return mapCategory(row);
 }
@@ -107,6 +119,8 @@ export async function deleteCategory(id) {
 }
 
 // ---------- medications ----------
+const DUPLICATE_MEDICATION_MESSAGE = "يوجد بالفعل دواء بهذا الاسم";
+
 export async function createMedication(clinicId, { name, categoryId }) {
   const row = unwrap(
     await supabase
@@ -114,6 +128,7 @@ export async function createMedication(clinicId, { name, categoryId }) {
       .insert({ clinic_id: clinicId, name, category_id: categoryId })
       .select()
       .single(),
+    DUPLICATE_MEDICATION_MESSAGE,
   );
   return mapMedication(row, []);
 }
@@ -124,6 +139,7 @@ export async function updateMedication(id, { name, categoryId }) {
       .from("medications")
       .update({ name, category_id: categoryId })
       .eq("id", id),
+    DUPLICATE_MEDICATION_MESSAGE,
   );
 }
 
@@ -166,6 +182,8 @@ export async function withdrawStock({ medicationId, qty, withdrawnOn, batchId = 
 }
 
 // ---------- first aid ----------
+const DUPLICATE_FIRST_AID_MESSAGE = "توجد بالفعل مادة إسعاف بهذا الاسم";
+
 export async function createFirstAid(clinicId, { name, qty, threshold }) {
   const row = unwrap(
     await supabase
@@ -178,6 +196,7 @@ export async function createFirstAid(clinicId, { name, qty, threshold }) {
       })
       .select()
       .single(),
+    DUPLICATE_FIRST_AID_MESSAGE,
   );
   return mapFirstAid(row);
 }
@@ -188,6 +207,7 @@ export async function updateFirstAid(id, { name, threshold }) {
       .from("first_aid_items")
       .update({ name, threshold: Number(threshold) })
       .eq("id", id),
+    DUPLICATE_FIRST_AID_MESSAGE,
   );
 }
 

@@ -18,7 +18,7 @@ import {
 import "./styles/global.css";
 import { styles } from "./styles/styles";
 import { DEFAULT_LABELS } from "./constants";
-import { todayISO, daysUntil } from "./lib/dates";
+import { todayISO, daysUntilMonthEnd, isExpired, formatMonthYear } from "./lib/dates";
 import { urgency, medUrgency } from "./lib/medications";
 import { useAuth } from "./hooks/useAuth";
 import { usePharmacyData } from "./hooks/usePharmacyData";
@@ -27,6 +27,7 @@ import { hasLegacyData, hasMigrationRun } from "./lib/migrateLegacyData";
 import { AuthScreen } from "./components/auth/AuthScreen";
 import { MigrationPrompt } from "./components/MigrationPrompt";
 import { SaveIndicator } from "./components/SaveIndicator";
+import { ConfirmModal } from "./components/ConfirmModal";
 import { Kpi } from "./components/Kpi";
 import { TabButton } from "./components/TabButton";
 import { EmptyState } from "./components/EmptyState";
@@ -64,6 +65,29 @@ function NotConfiguredScreen() {
   );
 }
 
+// Shown only when the initial pharmacy-data load itself failed (network
+// down, Supabase unreachable, etc.) — deliberately distinct from both the
+// loading screen and a legitimate empty-inventory EmptyState, so "we
+// couldn't load your data" is never mistaken for "this pharmacy has no
+// medications."
+function DataLoadErrorScreen({ message, onRetry }) {
+  return (
+    <div style={styles.loadingScreen}>
+      <div style={{ color: "#9A2E23", fontSize: 14, fontWeight: 700 }}>
+        تعذر تحميل بيانات الصيدلية
+      </div>
+      {message && (
+        <div style={{ color: "#5B6E6D", fontSize: 12.5, maxWidth: 420, textAlign: "center" }}>
+          {message}
+        </div>
+      )}
+      <button style={styles.primaryBtn} onClick={onRetry}>
+        إعادة المحاولة
+      </button>
+    </div>
+  );
+}
+
 export default function PharmacyApp() {
   const {
     configured,
@@ -81,6 +105,8 @@ export default function PharmacyApp() {
   const {
     state,
     loading: dataLoading,
+    loadError,
+    retryLoad,
     cloudStatus,
     error: dataError,
     refetch,
@@ -107,6 +133,10 @@ export default function PharmacyApp() {
   const [showSettings, setShowSettings] = useState(false);
   const [migrationDismissed, setMigrationDismissed] = useState(false);
 
+  const [confirmState, setConfirmState] = useState(null);
+  const askConfirm = (title, message, onConfirm) =>
+    setConfirmState({ title, message, onConfirm });
+
   const [showAddMed, setShowAddMed] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [editCategoryItem, setEditCategoryItem] = useState(null);
@@ -131,7 +161,10 @@ export default function PharmacyApp() {
     );
   }
   if (!profile) return <LoadingScreen text="جارٍ تحميل بيانات الحساب…" />;
-  if (dataLoading || !state) return <LoadingScreen text="جاري تحميل بيانات الصيدلية…" />;
+  if (dataLoading) return <LoadingScreen text="جاري تحميل بيانات الصيدلية…" />;
+  if (loadError || !state) {
+    return <DataLoadErrorScreen message={loadError} onRetry={retryLoad} />;
+  }
 
   const L = { ...DEFAULT_LABELS, ...state.uiLabels };
   // kept as a short local alias — matches the prop name every component below already expects.
@@ -169,10 +202,10 @@ export default function PharmacyApp() {
 
   const allBatches = state.medications.flatMap((m) => m.batches);
   const expiredCount = allBatches.filter(
-    (b) => b.qty > 0 && urgency(daysUntil(b.expiry)) === "expired",
+    (b) => b.qty > 0 && isExpired(b.expiry),
   ).length;
   const criticalCount = allBatches.filter(
-    (b) => b.qty > 0 && urgency(daysUntil(b.expiry)) === "critical",
+    (b) => b.qty > 0 && urgency(daysUntilMonthEnd(b.expiry)) === "critical",
   ).length;
   const lowFirstAid = state.firstAid.filter(
     (f) => f.qty <= f.threshold,
@@ -384,8 +417,28 @@ export default function PharmacyApp() {
                     onWithdrawCustom={() => setWithdrawModalMed(med)}
                     onHistory={() => setHistoryModalMed(med)}
                     onEdit={() => setEditMedItem(med)}
-                    onDeleteBatch={(batchId) => deleteBatch(med.id, batchId)}
-                    onDeleteMed={() => deleteMedication(med.id)}
+                    onDeleteBatch={(batchId) => {
+                      const batch = med.batches.find((b) => b.id === batchId);
+                      askConfirm(
+                        "حذف الدفعة",
+                        batch
+                          ? `هل أنت متأكد من حذف هذه الدفعة (${batch.qty} وحدة، تنتهي في ${formatMonthYear(batch.expiry)})؟ لا يمكن التراجع عن هذا الإجراء.`
+                          : "هل أنت متأكد من حذف هذه الدفعة؟ لا يمكن التراجع عن هذا الإجراء.",
+                        () => deleteBatch(med.id, batchId),
+                      );
+                    }}
+                    onDeleteMed={() => {
+                      const batchCount = med.batches.length;
+                      askConfirm(
+                        "حذف الدواء",
+                        batchCount > 0
+                          ? `هل أنت متأكد من حذف "${med.name}"؟ حذف هذا الدواء سيؤدي أيضًا إلى حذف الدفعات المرتبطة به من المخزون (${batchCount} ${
+                              batchCount === 1 ? "دفعة" : "دفعات"
+                            }). لا يمكن التراجع عن هذا الإجراء.`
+                          : `هل أنت متأكد من حذف "${med.name}"؟ لا يمكن التراجع عن هذا الإجراء.`,
+                        () => deleteMedication(med.id),
+                      );
+                    }}
                   />
                 ))}
               </div>
@@ -401,7 +454,14 @@ export default function PharmacyApp() {
           items={state.firstAid}
           onAdd={() => setShowAddFirstAid(true)}
           onAdjust={adjustFirstAid}
-          onDelete={deleteFirstAid}
+          onDelete={(id) => {
+            const item = state.firstAid.find((f) => f.id === id);
+            askConfirm(
+              "حذف مادة الإسعاف",
+              `هل أنت متأكد من حذف "${item?.name ?? ""}"؟ لا يمكن التراجع عن هذا الإجراء.`,
+              () => deleteFirstAid(id),
+            );
+          }}
           onEdit={(item) => setEditFirstAidItem(item)}
         />
       )}
@@ -615,6 +675,18 @@ export default function PharmacyApp() {
             }}
           />
         </Modal>
+      )}
+
+      {confirmState && (
+        <ConfirmModal
+          title={confirmState.title}
+          message={confirmState.message}
+          onConfirm={() => {
+            confirmState.onConfirm();
+            setConfirmState(null);
+          }}
+          onCancel={() => setConfirmState(null)}
+        />
       )}
     </div>
   );

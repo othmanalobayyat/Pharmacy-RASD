@@ -4,10 +4,6 @@ import { isSupabaseConfigured } from "../lib/supabase";
 
 const REALTIME_REFETCH_DEBOUNCE_MS = 300;
 
-function emptyState() {
-  return { categories: [], medications: [], firstAid: [], log: [], uiLabels: {} };
-}
-
 // Supabase is now the source of truth (see supabase/migrations/). This hook
 // loads the clinic's dataset, keeps it live-synced across devices via
 // Realtime, and exposes the same mutation function names the components
@@ -17,6 +13,12 @@ function emptyState() {
 export function usePharmacyData(clinicId) {
   const [state, setState] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Distinct from `error` below: this is specifically "the initial dataset
+  // never loaded," so the UI can render an explicit failure screen instead
+  // of quietly showing `state === null` (loading) or an empty pharmacy. It
+  // is intentionally NEVER satisfied by substituting an empty dataset — a
+  // failed load must never look identical to "this clinic has no inventory."
+  const [loadError, setLoadError] = useState("");
   const [cloudStatus, setCloudStatus] = useState("idle"); // idle | saving | error
   const [error, setError] = useState("");
 
@@ -33,34 +35,40 @@ export function usePharmacyData(clinicId) {
     }
   }, [clinicId]);
 
-  // initial load
+  // Initial load. On failure, `state` is deliberately left as-is (null on a
+  // fresh mount) rather than replaced with an empty-but-valid-looking
+  // dataset — see `loadError` above.
+  const loadInitial = useCallback(async () => {
+    if (!clinicId) return;
+    setLoading(true);
+    setLoadError("");
+    try {
+      const data = await api.fetchClinicData();
+      if (mountedRef.current) setState(data);
+    } catch (e) {
+      if (mountedRef.current) {
+        setLoadError(e.message || "تعذر تحميل بيانات الصيدلية");
+      }
+    } finally {
+      if (mountedRef.current) setLoading(false);
+    }
+  }, [clinicId]);
+
   useEffect(() => {
     mountedRef.current = true;
     if (!clinicId) {
       setState(null);
       setLoading(false);
+      setLoadError("");
       return () => {
         mountedRef.current = false;
       };
     }
-    setLoading(true);
-    (async () => {
-      try {
-        const data = await api.fetchClinicData();
-        if (mountedRef.current) setState(data);
-      } catch (e) {
-        if (mountedRef.current) {
-          setState(emptyState());
-          setError(e.message);
-        }
-      } finally {
-        if (mountedRef.current) setLoading(false);
-      }
-    })();
+    loadInitial();
     return () => {
       mountedRef.current = false;
     };
-  }, [clinicId]);
+  }, [clinicId, loadInitial]);
 
   // realtime: any insert/update/delete on the clinic's rows (from this
   // device or another one) triggers a debounced refetch so a single RPC
@@ -167,6 +175,8 @@ export function usePharmacyData(clinicId) {
   return {
     state,
     loading,
+    loadError,
+    retryLoad: loadInitial,
     cloudStatus,
     error,
     refetch,

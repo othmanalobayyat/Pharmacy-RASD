@@ -1,7 +1,7 @@
 import { History, Minus, Pencil, Plus, Trash2, TrendingDown, X } from "lucide-react";
 import { styles } from "../styles/styles";
 import { URGENCY_STYLE } from "../constants";
-import { daysUntil } from "../lib/dates";
+import { daysUntilMonthEnd, formatMonthYear } from "../lib/dates";
 import { medTotalQty, urgency } from "../lib/medications";
 
 export function MedCard({
@@ -82,7 +82,10 @@ export function MedCard({
       ) : (
         <div style={styles.shelfTimeline}>
           {sortedBatches.map((b) => {
-            const d = daysUntil(b.expiry);
+            // Days until the end of the expiry MONTH (not the stored day) —
+            // expiry is month/year only, so a batch is still fully valid on
+            // every day of its expiry month.
+            const d = daysUntilMonthEnd(b.expiry);
             const s = URGENCY_STYLE[urgency(d)];
             return (
               <div
@@ -112,7 +115,7 @@ export function MedCard({
                     }}
                   />
                   <span style={{ fontWeight: 700 }}>{b.qty} وحدة</span>
-                  <span style={{ opacity: 0.85 }}>· ينتهي {b.expiry}</span>
+                  <span style={{ opacity: 0.85 }}>· ينتهي {formatMonthYear(b.expiry)}</span>
                   <span style={{ opacity: 0.85 }}>
                     · {d < 0 ? `منتهٍ منذ ${Math.abs(d)} يوم` : `بعد ${d} يوم`}
                   </span>

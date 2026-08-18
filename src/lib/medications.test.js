@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { urgency, medEarliestBatch, medTotalQty, medUrgency } from "./medications";
+import {
+  urgency,
+  medEarliestBatch,
+  medTotalQty,
+  medUrgency,
+  withdrawableBatches,
+} from "./medications";
 
 describe("urgency()", () => {
   it("classifies a past date as expired", () => {
@@ -64,6 +70,71 @@ describe("medTotalQty()", () => {
   });
   it("is 0 for a medication with no batches", () => {
     expect(medTotalQty({ batches: [] })).toBe(0);
+  });
+});
+
+describe("withdrawableBatches() — expired stock must never be offered for withdrawal", () => {
+  // All dates here are absolute, with an explicit reference ("today") date,
+  // so these never depend on which real day the suite happens to run on —
+  // see lib/dates.test.js for why that matters under month/year expiry
+  // (a day-relative "yesterday" is usually still in the SAME expiry month).
+  const REFERENCE = "2026-08-15"; // "today" for every test in this block
+
+  it("selects the earliest-expiring NON-EXPIRED batch as the first (FEFO) choice", () => {
+    // Mirrors the exact example from the business rule: 07/2026 expired,
+    // 08/2026 valid and selected first, 11/2026 valid and selected after.
+    const med = {
+      batches: [
+        { id: "batch-a-07-2026", expiry: "2026-07-01", qty: 10 }, // earliest overall, but expired
+        { id: "batch-b-08-2026", expiry: "2026-08-01", qty: 20 },
+        { id: "batch-c-11-2026", expiry: "2026-11-01", qty: 5 },
+      ],
+    };
+    const result = withdrawableBatches(med, REFERENCE);
+    expect(result.map((b) => b.id)).toEqual(["batch-b-08-2026", "batch-c-11-2026"]);
+  });
+
+  it("ignores an expired batch even though it has plenty of quantity", () => {
+    const med = {
+      batches: [{ id: "b-expired", expiry: "2026-07-01", qty: 999 }],
+    };
+    expect(withdrawableBatches(med, REFERENCE)).toEqual([]);
+  });
+
+  it("ignores a batch with zero quantity even if it is not expired", () => {
+    const med = {
+      batches: [{ id: "b-empty", expiry: "2026-10-01", qty: 0 }],
+    };
+    expect(withdrawableBatches(med, REFERENCE)).toEqual([]);
+  });
+
+  it("returns an empty list when every batch is expired (withdrawal must fail safely)", () => {
+    const med = {
+      batches: [
+        { id: "b1", expiry: "2026-06-01", qty: 5 },
+        { id: "b2", expiry: "2026-07-01", qty: 3 },
+      ],
+    };
+    expect(withdrawableBatches(med, REFERENCE)).toEqual([]);
+  });
+
+  it("a batch expiring in the current month is still fully withdrawable, on any day of that month", () => {
+    const med = { batches: [{ id: "b-this-month", expiry: "2026-08-01", qty: 4 }] };
+    // "today" as the 1st, the 15th, and the last day of the same expiry month
+    expect(withdrawableBatches(med, "2026-08-01").map((b) => b.id)).toEqual(["b-this-month"]);
+    expect(withdrawableBatches(med, "2026-08-15").map((b) => b.id)).toEqual(["b-this-month"]);
+    expect(withdrawableBatches(med, "2026-08-31").map((b) => b.id)).toEqual(["b-this-month"]);
+  });
+
+  it("that same batch becomes unwithdrawable the instant the next month starts", () => {
+    const med = { batches: [{ id: "b-this-month", expiry: "2026-08-01", qty: 4 }] };
+    expect(withdrawableBatches(med, "2026-09-01")).toEqual([]);
+  });
+
+  it("is unaffected by the legacy stored day-of-month (e.g. day=17 from the old picker)", () => {
+    const med = { batches: [{ id: "b-legacy-day17", expiry: "2026-08-17", qty: 4 }] };
+    expect(withdrawableBatches(med, "2026-08-31").map((b) => b.id)).toEqual(["b-legacy-day17"]);
+    expect(withdrawableBatches(med, "2026-09-01")).toEqual([]);
   });
 });
 

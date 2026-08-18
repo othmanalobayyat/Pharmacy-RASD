@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { styles } from "../../styles/styles";
+import { withdrawableBatches } from "../../lib/medications";
+import { formatMonthYear } from "../../lib/dates";
 
 export function WithdrawForm({ med, sessionDate, onSubmit }) {
-  const sortedBatches = [...med.batches]
-    .filter((b) => b.qty > 0)
-    .sort((a, b) => new Date(a.expiry) - new Date(b.expiry));
+  // Expired batches are excluded here too (not just server-side) so the
+  // dropdown never offers a choice the withdraw_stock RPC would reject.
+  const sortedBatches = withdrawableBatches(med);
   const [batchId, setBatchId] = useState(sortedBatches[0]?.id || "");
   const [qty, setQty] = useState("1");
   const [date, setDate] = useState(sessionDate);
@@ -36,7 +38,7 @@ export function WithdrawForm({ med, sessionDate, onSubmit }) {
           >
             {sortedBatches.map((b) => (
               <option key={b.id} value={b.id}>
-                ينتهي {b.expiry} — متوفر {b.qty}
+                ينتهي {formatMonthYear(b.expiry)} — متوفر {b.qty}
               </option>
             ))}
           </select>

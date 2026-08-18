@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { styles } from "../styles/styles";
-import { daysAgoLabel, todayISO } from "../lib/dates";
+import { daysAgoLabel, formatMonthYear, todayISO } from "../lib/dates";
 import { medTotalQty } from "../lib/medications";
 
 export function MedHistory({ med, log }) {
@@ -76,7 +76,7 @@ export function MedHistory({ med, log }) {
                     </span>
                   </td>
                   <td style={styles.td}>{l.qty}</td>
-                  <td style={styles.td}>{l.expiry}</td>
+                  <td style={styles.td}>{l.expiry ? formatMonthYear(l.expiry) : "—"}</td>
                   <td style={{ ...styles.td, color: "#7C918F" }}>
                     {l.performedByEmail || "—"}
                   </td>

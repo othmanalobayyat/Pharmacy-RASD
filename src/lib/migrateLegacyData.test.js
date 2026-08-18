@@ -158,4 +158,45 @@ describe("migrateLegacyDataToSupabase()", () => {
     const result = await migrateLegacyDataToSupabase(CLINIC_ID);
     expect(result).toEqual({ migrated: false, reason: "no-legacy-data" });
   });
+
+  it("normalizes a legacy day-precision expiry to day=1 of the SAME month, without shifting the month", async () => {
+    // Legacy batches were entered through the old day-precision date picker
+    // (e.g. day=15). Expiry is now month/year only — this must become
+    // "2026-08-01", never silently roll into July or September.
+    seedLegacy({
+      categories: [],
+      medications: [
+        {
+          id: "med-legacy-1",
+          name: "بنادول",
+          categoryId: null,
+          batches: [{ id: "batch-legacy-1", expiry: "2026-08-15", qty: 7 }],
+        },
+      ],
+      firstAid: [],
+      log: [
+        {
+          id: "log-legacy-1",
+          medId: "med-legacy-1",
+          medName: "بنادول",
+          batchId: "batch-legacy-1",
+          expiry: "2026-08-31", // same month, different day than the batch above
+          qty: 1,
+          date: "2026-08-20",
+        },
+      ],
+      uiLabels: {},
+    });
+
+    await migrateLegacyDataToSupabase(CLINIC_ID);
+
+    expect(mockApi.createBatch).toHaveBeenCalledWith(
+      CLINIC_ID,
+      "new-med-بنادول",
+      { expiry: "2026-08-01", qty: 7 },
+    );
+    expect(mockApi.importLegacyWithdrawalLog).toHaveBeenCalledWith(
+      expect.objectContaining({ expiry: "2026-08-01" }),
+    );
+  });
 });

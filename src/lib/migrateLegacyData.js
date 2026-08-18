@@ -14,6 +14,19 @@
 // are not.
 
 import * as api from "./pharmacyApi";
+import { isoToMonthInput, monthInputToISO } from "./dates";
+
+// Legacy batches/logs were entered through the old day-precision date
+// picker, so their stored `expiry` may have any day-of-month. The business
+// meaning was always "expires at the end of this month" (see
+// supabase/migrations/0010_month_year_expiry.sql) — the day was never
+// actually meaningful, so normalizing it to day=1 on import doesn't change
+// what a batch means, it just aligns its stored shape with every other
+// batch going forward (and satisfies the new `batches` CHECK constraint,
+// which rejects non-day-1 values on INSERT).
+function normalizeToMonthStart(isoDate) {
+  return monthInputToISO(isoToMonthInput(isoDate));
+}
 
 export const LEGACY_STORAGE_KEY = "clinic-pharmacy-state-v1";
 const MIGRATION_FLAG_KEY = "clinic-pharmacy-migrated-v1";
@@ -99,7 +112,7 @@ export async function migrateLegacyDataToSupabase(clinicId) {
     for (const b of m.batches || []) {
       if (!b?.expiry || typeof b.qty !== "number") continue;
       const createdBatch = await api.createBatch(clinicId, created.id, {
-        expiry: b.expiry,
+        expiry: normalizeToMonthStart(b.expiry),
         qty: b.qty,
       });
       batchIdMap.set(b.id, createdBatch.id);
@@ -125,7 +138,7 @@ export async function migrateLegacyDataToSupabase(clinicId) {
       medicationId: medicationIdMap.get(l.medId) || null,
       medName: l.medName,
       batchId: batchIdMap.get(l.batchId) || null,
-      expiry: l.expiry || null,
+      expiry: l.expiry ? normalizeToMonthStart(l.expiry) : null,
       qty: l.qty,
       withdrawnOn: l.date,
     });

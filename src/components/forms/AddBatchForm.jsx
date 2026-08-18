@@ -1,25 +1,30 @@
 import { useState } from "react";
 import { Check } from "lucide-react";
 import { styles } from "../../styles/styles";
+import { monthInputToISO } from "../../lib/dates";
 
 export function AddBatchForm({ onSubmit }) {
-  const [expiry, setExpiry] = useState("");
+  // Expiry is month/year only (business rule) — a native month input never
+  // lets the user pick a day, and the value is converted to the day-01 ISO
+  // date this app stores (see lib/dates.js monthInputToISO) only at submit
+  // time, so the rest of the app keeps working with a plain ISO date string.
+  const [expiryMonth, setExpiryMonth] = useState("");
   const [qty, setQty] = useState("");
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ expiry, qty });
+        onSubmit({ expiry: monthInputToISO(expiryMonth), qty });
       }}
       style={styles.form}
     >
       <label style={styles.label}>
-        تاريخ انتهاء الدفعة
+        شهر/سنة انتهاء الصلاحية
         <input
-          type="date"
+          type="month"
           style={styles.input}
-          value={expiry}
-          onChange={(e) => setExpiry(e.target.value)}
+          value={expiryMonth}
+          onChange={(e) => setExpiryMonth(e.target.value)}
           required
         />
       </label>
