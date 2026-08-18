@@ -16,7 +16,7 @@ export function WithdrawForm({ med, sessionDate, onSubmit }) {
   if (sortedBatches.length === 0) {
     return (
       <div style={{ padding: "8px 4px", color: "#7C918F" }}>
-        لا يوجد كمية متاحة لهذا الدواء.
+        لا يوجد مخزون صالح للصرف لهذا الدواء.
       </div>
     );
   }

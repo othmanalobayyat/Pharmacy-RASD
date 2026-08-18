@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { styles } from "../styles/styles";
+import { URGENCY_STYLE } from "../constants";
 import { daysAgoLabel, formatMonthYear, todayISO } from "../lib/dates";
-import { medTotalQty } from "../lib/medications";
+import { medAvailableQty, medExpiredQty } from "../lib/medications";
 
 export function MedHistory({ med, log }) {
   const [range, setRange] = useState("7");
-  const total = medTotalQty(med);
+  // "المتبقي الآن" means currently withdrawable, not raw physical stock —
+  // same rule as MedCard (see lib/medications.js medAvailableQty).
+  const available = medAvailableQty(med);
+  const expired = medExpiredQty(med);
   const medLog = log
     .filter((l) => l.medId === med.id)
     .sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -23,7 +27,7 @@ export function MedHistory({ med, log }) {
       <div style={styles.historySummaryRow}>
         <div style={styles.historySummaryBox}>
           <div style={{ fontSize: 20, fontWeight: 800, color: "#145C5C" }}>
-            {total}
+            {available}
           </div>
           <div style={{ fontSize: 11.5, color: "#7C918F" }}>المتبقي الآن</div>
         </div>
@@ -35,6 +39,14 @@ export function MedHistory({ med, log }) {
             مصروف بالفترة المحددة
           </div>
         </div>
+        {expired > 0 && (
+          <div style={styles.historySummaryBox}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: URGENCY_STYLE.expired.fg }}>
+              {expired}
+            </div>
+            <div style={{ fontSize: 11.5, color: "#7C918F" }}>⚠️ منتهي</div>
+          </div>
+        )}
       </div>
       <div style={styles.rangeChips}>
         {[

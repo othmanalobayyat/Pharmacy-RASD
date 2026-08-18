@@ -36,6 +36,27 @@ export function medTotalQty(med) {
   return med.batches.reduce((sum, b) => sum + b.qty, 0);
 }
 
+// ---------- available vs. expired quantity ----------
+//
+// medTotalQty() above counts every unit physically on the shelf, expired or
+// not — fine for "how much stock exists," misleading as "how much can be
+// dispensed." These two split that total by the same month/year expiry rule
+// used everywhere else (see lib/dates.js isExpired()): every batch falls
+// into exactly one bucket, so medAvailableQty(med) + medExpiredQty(med)
+// always equals medTotalQty(med). Neither changes any stored quantity —
+// purely a display-time split of data that's already loaded.
+export function medAvailableQty(med, referenceISO = todayISO()) {
+  return med.batches
+    .filter((b) => !isExpired(b.expiry, referenceISO))
+    .reduce((sum, b) => sum + b.qty, 0);
+}
+
+export function medExpiredQty(med, referenceISO = todayISO()) {
+  return med.batches
+    .filter((b) => isExpired(b.expiry, referenceISO))
+    .reduce((sum, b) => sum + b.qty, 0);
+}
+
 export function medUrgency(med) {
   const earliest = medEarliestBatch(med);
   if (!earliest) return "empty";

@@ -3,6 +3,8 @@ import {
   urgency,
   medEarliestBatch,
   medTotalQty,
+  medAvailableQty,
+  medExpiredQty,
   medUrgency,
   withdrawableBatches,
 } from "./medications";
@@ -135,6 +137,106 @@ describe("withdrawableBatches() — expired stock must never be offered for with
     const med = { batches: [{ id: "b-legacy-day17", expiry: "2026-08-17", qty: 4 }] };
     expect(withdrawableBatches(med, "2026-08-31").map((b) => b.id)).toEqual(["b-legacy-day17"]);
     expect(withdrawableBatches(med, "2026-09-01")).toEqual([]);
+  });
+});
+
+describe("medAvailableQty() / medExpiredQty() — accurate withdrawable vs. expired stock", () => {
+  // Fixed reference date so these never depend on the real current date.
+  const REFERENCE = "2026-08-15";
+
+  it("medication with only valid batches: total = available, expired = 0", () => {
+    const med = {
+      batches: [
+        { id: "b1", expiry: "2026-08-01", qty: 12 },
+        { id: "b2", expiry: "2026-11-01", qty: 8 },
+      ],
+    };
+    expect(medAvailableQty(med, REFERENCE)).toBe(20);
+    expect(medExpiredQty(med, REFERENCE)).toBe(0);
+    expect(medAvailableQty(med, REFERENCE) + medExpiredQty(med, REFERENCE)).toBe(
+      medTotalQty(med),
+    );
+  });
+
+  it("medication with valid + expired batches: matches the exact business example (12 available, 8 expired, 20 total)", () => {
+    const med = {
+      batches: [
+        { id: "valid", expiry: "2026-08-01", qty: 12 }, // 08/2026 — valid in August 2026
+        { id: "expired", expiry: "2026-07-01", qty: 8 }, // 07/2026 — expired by August 2026
+      ],
+    };
+    expect(medTotalQty(med)).toBe(20);
+    expect(medAvailableQty(med, REFERENCE)).toBe(12);
+    expect(medExpiredQty(med, REFERENCE)).toBe(8);
+  });
+
+  it("medication with only expired batches: available = 0, expired = total", () => {
+    const med = {
+      batches: [
+        { id: "b1", expiry: "2026-06-01", qty: 15 },
+        { id: "b2", expiry: "2026-07-01", qty: 5 },
+      ],
+    };
+    expect(medAvailableQty(med, REFERENCE)).toBe(0);
+    expect(medExpiredQty(med, REFERENCE)).toBe(20);
+    expect(medExpiredQty(med, REFERENCE)).toBe(medTotalQty(med));
+  });
+
+  it("a batch expiring in the current month counts as fully available, any day of that month", () => {
+    const med = { batches: [{ id: "b1", expiry: "2026-08-01", qty: 10 }] };
+    expect(medAvailableQty(med, "2026-08-01")).toBe(10);
+    expect(medAvailableQty(med, "2026-08-31")).toBe(10);
+    expect(medExpiredQty(med, "2026-08-31")).toBe(0);
+  });
+
+  it("a batch from a previous month is fully expired", () => {
+    const med = { batches: [{ id: "b1", expiry: "2026-07-01", qty: 10 }] };
+    expect(medAvailableQty(med, REFERENCE)).toBe(0);
+    expect(medExpiredQty(med, REFERENCE)).toBe(10);
+  });
+
+  it("FEFO (withdrawableBatches) still selects the earliest valid expiry month, unaffected by expired stock existing", () => {
+    const med = {
+      batches: [
+        { id: "expired-earliest", expiry: "2026-06-01", qty: 8 },
+        { id: "valid-earliest", expiry: "2026-08-01", qty: 12 },
+        { id: "valid-later", expiry: "2026-11-01", qty: 5 },
+      ],
+    };
+    expect(withdrawableBatches(med, REFERENCE).map((b) => b.id)).toEqual([
+      "valid-earliest",
+      "valid-later",
+    ]);
+    // and the quantity split is still correct alongside it
+    expect(medAvailableQty(med, REFERENCE)).toBe(17);
+    expect(medExpiredQty(med, REFERENCE)).toBe(8);
+  });
+
+  it("zero-quantity batches contribute nothing to either bucket, expired or not", () => {
+    const med = {
+      batches: [
+        { id: "empty-valid", expiry: "2026-11-01", qty: 0 },
+        { id: "empty-expired", expiry: "2026-06-01", qty: 0 },
+      ],
+    };
+    expect(medAvailableQty(med, REFERENCE)).toBe(0);
+    expect(medExpiredQty(med, REFERENCE)).toBe(0);
+    expect(medTotalQty(med)).toBe(0);
+  });
+
+  it("mixed batches with zero, valid, and expired quantities are all calculated correctly together", () => {
+    const med = {
+      batches: [
+        { id: "zero", expiry: "2026-09-01", qty: 0 },
+        { id: "valid-1", expiry: "2026-08-01", qty: 6 },
+        { id: "valid-2", expiry: "2026-12-01", qty: 4 },
+        { id: "expired-1", expiry: "2026-05-01", qty: 3 },
+        { id: "expired-2", expiry: "2026-07-01", qty: 7 },
+      ],
+    };
+    expect(medAvailableQty(med, REFERENCE)).toBe(10); // 6 + 4
+    expect(medExpiredQty(med, REFERENCE)).toBe(10); // 3 + 7
+    expect(medTotalQty(med)).toBe(20);
   });
 });
 

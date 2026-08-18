@@ -3,30 +3,48 @@
 // (auth state is needed before any clinic data can load at all).
 
 import { supabase } from "./supabase";
+import { logAndThrow } from "./errorMessages";
 
 export async function signUp(email, password) {
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) throw new Error(error.message);
+  let data, error;
+  try {
+    ({ data, error } = await supabase.auth.signUp({ email, password }));
+  } catch (networkError) {
+    logAndThrow("auth.signUp", networkError);
+  }
+  if (error) logAndThrow("auth.signUp", error);
   return data;
 }
 
 export async function signIn(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-  if (error) throw new Error(error.message);
+  let data, error;
+  try {
+    ({ data, error } = await supabase.auth.signInWithPassword({ email, password }));
+  } catch (networkError) {
+    logAndThrow("auth.signIn", networkError);
+  }
+  if (error) logAndThrow("auth.signIn", error);
   return data;
 }
 
 export async function signOut() {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw new Error(error.message);
+  let error;
+  try {
+    ({ error } = await supabase.auth.signOut());
+  } catch (networkError) {
+    logAndThrow("auth.signOut", networkError);
+  }
+  if (error) logAndThrow("auth.signOut", error);
 }
 
 export async function getSession() {
-  const { data, error } = await supabase.auth.getSession();
-  if (error) throw new Error(error.message);
+  let data, error;
+  try {
+    ({ data, error } = await supabase.auth.getSession());
+  } catch (networkError) {
+    logAndThrow("auth.getSession", networkError);
+  }
+  if (error) logAndThrow("auth.getSession", error);
   return data.session;
 }
 
@@ -41,13 +59,17 @@ export function onAuthStateChange(callback) {
 // camelCase. Kept here rather than in pharmacyApi.js since "who am I / what
 // role do I have" is an auth concern, not a pharmacy-inventory one.
 export async function fetchProfile(userId) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
+  let data, error;
+  try {
+    ({ data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle());
+  } catch (networkError) {
+    logAndThrow("auth.fetchProfile", networkError);
+  }
+  if (error) logAndThrow("auth.fetchProfile", error);
 
   return data
     ? { id: data.id, clinicId: data.clinic_id, email: data.email, role: data.role }

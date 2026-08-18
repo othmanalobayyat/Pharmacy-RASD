@@ -2,7 +2,7 @@ import { History, Minus, Pencil, Plus, Trash2, TrendingDown, X } from "lucide-re
 import { styles } from "../styles/styles";
 import { URGENCY_STYLE } from "../constants";
 import { daysUntilMonthEnd, formatMonthYear } from "../lib/dates";
-import { medTotalQty, urgency } from "../lib/medications";
+import { medAvailableQty, medExpiredQty, urgency } from "../lib/medications";
 
 export function MedCard({
   med,
@@ -17,7 +17,12 @@ export function MedCard({
   onDeleteBatch,
   onDeleteMed,
 }) {
-  const total = medTotalQty(med);
+  // "متوفر"/"متبقية" must mean currently withdrawable, never raw physical
+  // stock — a medication with 20 units on the shelf but all expired has 0
+  // available, not 20. See lib/medications.js medAvailableQty/medExpiredQty.
+  const available = medAvailableQty(med);
+  const expired = medExpiredQty(med);
+  const total = available + expired;
   const sortedBatches = [...med.batches].sort(
     (a, b) => new Date(a.expiry) - new Date(b.expiry),
   );
@@ -54,16 +59,16 @@ export function MedCard({
           <button
             style={{
               ...styles.stepBtn,
-              ...(total === 0 ? styles.btnDisabled : {}),
+              ...(available === 0 ? styles.btnDisabled : {}),
             }}
-            onClick={total > 0 ? onQuickWithdraw : undefined}
+            onClick={available > 0 ? onQuickWithdraw : undefined}
             title="سحب حبة/وحدة واحدة بتاريخ اليوم المحدد أعلاه"
           >
             <Minus size={15} />
           </button>
         )}
         <div style={styles.quickQtyBox}>
-          <span style={{ fontWeight: 800, fontSize: 16 }}>{total}</span>
+          <span style={{ fontWeight: 800, fontSize: 16 }}>{available}</span>
           <span style={{ color: "#7C918F", fontSize: 11.5 }}>
             {L.remainingUnitLabel}
           </span>
@@ -76,6 +81,26 @@ export function MedCard({
           <History size={16} />
         </button>
       </div>
+
+      {expired > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 11.5,
+            fontWeight: 700,
+            color: URGENCY_STYLE.expired.fg,
+            background: URGENCY_STYLE.expired.bg,
+            borderRadius: 8,
+            padding: "5px 8px",
+          }}
+        >
+          <span>
+            ⚠️ منتهي: {expired} {available > 0 && `· الإجمالي: ${total}`}
+          </span>
+        </div>
+      )}
 
       {sortedBatches.length === 0 ? (
         <div style={styles.noBatch}>لا توجد دفعات مسجّلة</div>
@@ -143,9 +168,9 @@ export function MedCard({
           <button
             style={{
               ...styles.secondaryBtn,
-              ...(total === 0 ? styles.btnDisabled : {}),
+              ...(available === 0 ? styles.btnDisabled : {}),
             }}
-            onClick={total > 0 ? onWithdrawCustom : undefined}
+            onClick={available > 0 ? onWithdrawCustom : undefined}
           >
             <TrendingDown size={14} /> {L.withdrawCustomBtn}
           </button>
