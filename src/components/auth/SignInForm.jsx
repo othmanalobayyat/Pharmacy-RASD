@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Mail, Lock } from "lucide-react";
 import { styles } from "../../styles/styles";
 
 export function SignInForm({ onSubmit, error }) {
@@ -23,30 +23,38 @@ export function SignInForm({ onSubmit, error }) {
         }
       }}
     >
-      <label style={styles.label}>
+      <label style={styles.authLabel}>
         البريد الإلكتروني
-        <input
-          type="email"
-          required
-          style={styles.input}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoFocus
-        />
+        <div style={styles.authInputWrap}>
+          <Mail size={16} style={styles.authInputIcon} />
+          <input
+            type="email"
+            required
+            style={styles.authInput}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="أدخل بريدك الإلكتروني"
+            autoFocus
+          />
+        </div>
       </label>
-      <label style={styles.label}>
+      <label style={styles.authLabel}>
         كلمة المرور
-        <input
-          type="password"
-          required
-          style={styles.input}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <div style={styles.authInputWrap}>
+          <Lock size={16} style={styles.authInputIcon} />
+          <input
+            type="password"
+            required
+            style={styles.authInput}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="أدخل كلمة المرور"
+          />
+        </div>
       </label>
-      {error && <div style={{ color: "#9A2E23", fontSize: 12.5 }}>{error}</div>}
-      <button type="submit" style={styles.primaryBtn} disabled={busy}>
-        <Check size={16} /> {busy ? "جارٍ الدخول…" : "دخول"}
+      {error && <div style={styles.authError}>{error}</div>}
+      <button type="submit" className="auth-primary-btn" style={styles.authPrimaryBtn} disabled={busy}>
+        <Check size={17} /> {busy ? "جارٍ الدخول…" : "دخول"}
       </button>
     </form>
   );

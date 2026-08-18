@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Radar } from "lucide-react";
+import { Radar, Pill } from "lucide-react";
 import { styles } from "../../styles/styles";
 import { SignInForm } from "./SignInForm";
 import { SignUpForm } from "./SignUpForm";
@@ -8,50 +8,65 @@ import { SignUpForm } from "./SignUpForm";
 // the old PIN-gated "owner mode" toggle — every user now has a real Supabase
 // account, and read/write permissions are enforced by RLS, not by whether
 // this screen was shown.
+//
+// Visual/UX polish pass only — signIn/signUp/authError still come straight
+// from useAuth() untouched; this component only decides how the same
+// mode/tab state and the same two form components are presented.
 export function AuthScreen({ appTitle, appSubtitle, signIn, signUp, authError }) {
   const [mode, setMode] = useState("signin");
 
   return (
-    <div style={styles.app}>
-      <header style={styles.header}>
-        <div style={styles.headerTitleRow}>
-          <div style={styles.headerLogo}>
-            <Radar size={20} color="#F6F5F1" />
+    <div style={styles.authPage}>
+      <div className="auth-decor-circle" style={styles.authDecorCircleA} aria-hidden="true" />
+      <div className="auth-decor-circle" style={styles.authDecorCircleB} aria-hidden="true" />
+
+      <header style={styles.authHeader}>
+        <div style={styles.authHeaderInner}>
+          <div style={styles.authHeaderBadge}>
+            <Radar size={17} color="#F6F5F1" />
           </div>
           <div>
-            <h1 style={styles.h1}>{appTitle}</h1>
-            <div style={styles.subtitle}>{appSubtitle}</div>
+            <h1 style={styles.authHeaderTitle}>{appTitle}</h1>
+            <div style={styles.authHeaderSubtitle}>{appSubtitle}</div>
           </div>
         </div>
       </header>
 
-      <div
-        style={{
-          maxWidth: 380,
-          margin: "40px auto",
-          padding: "0 16px",
-        }}
-      >
-        <div
-          style={{
-            background: "#fff",
-            border: "1px solid #DCE8E6",
-            borderRadius: 16,
-            padding: 20,
-          }}
-        >
-          <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+      <main style={styles.authMain}>
+        <div style={styles.authCard}>
+          <div style={styles.authCardHead}>
+            <div style={styles.authCardIconBadge}>
+              <Pill size={24} color="#fff" />
+            </div>
+            <div>
+              <div style={styles.authCardWelcome}>مرحبًا بك في</div>
+              <div style={styles.authCardBrand}>{appTitle}</div>
+            </div>
+            <div style={styles.authCardDescription}>
+              {mode === "signin"
+                ? "سجّل الدخول للوصول إلى نظام إدارة المخزون ومتابعة الأدوية"
+                : "أنشئ حسابًا للانضمام إلى نظام إدارة الصيدلية"}
+            </div>
+          </div>
+
+          <div style={styles.authTabTrack} role="tablist">
             <button
-              style={styles.tabBtn(mode === "signin")}
+              className="auth-tab"
+              style={styles.authTab(mode === "signin")}
               onClick={() => setMode("signin")}
               type="button"
+              role="tab"
+              aria-selected={mode === "signin"}
             >
               دخول
             </button>
             <button
-              style={styles.tabBtn(mode === "signup")}
+              className="auth-tab"
+              style={styles.authTab(mode === "signup")}
               onClick={() => setMode("signup")}
               type="button"
+              role="tab"
+              aria-selected={mode === "signup"}
             >
               حساب جديد
             </button>
@@ -63,7 +78,9 @@ export function AuthScreen({ appTitle, appSubtitle, signIn, signUp, authError })
             <SignUpForm onSubmit={signUp} error={authError} />
           )}
         </div>
-      </div>
+      </main>
+
+      <footer style={styles.authFooter}>{appTitle} — نظام إدارة مخزون العيادة المتنقلة</footer>
     </div>
   );
 }

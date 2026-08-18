@@ -14,6 +14,24 @@ button:focus-visible {
   color: #a7b8b6;
 }
 
+/* Auth screen (visual/UX polish only) — scoped class names, only used by
+   src/components/auth/*, so these rules cannot affect the dashboard. */
+.auth-primary-btn:hover:not(:disabled) {
+  background: #0e4747;
+}
+.auth-primary-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.auth-tab:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+@media (max-width: 480px) {
+  .auth-decor-circle {
+    display: none;
+  }
+}
+
 @media (max-width: 760px) {
   .pharmacy-body {
     flex-direction: column !important;
