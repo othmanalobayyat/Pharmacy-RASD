@@ -32,10 +32,6 @@ export function SignUpForm({ onSubmit, error }) {
         }
       }}
     >
-      <div style={styles.authHelperNote}>
-        أول شخص يسجّل حساب بيصير مسؤول العيادة تلقائيًا؛ أي حساب بعده بيكون
-        بصلاحية "موظف" وممكن المسؤول يرفع صلاحيته لاحقًا من الإعدادات.
-      </div>
       <label style={styles.authLabel}>
         البريد الإلكتروني
         <div style={styles.authInputWrap}>

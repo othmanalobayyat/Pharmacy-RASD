@@ -647,15 +647,6 @@ export const styles = {
     fontSize: 12.5,
     lineHeight: 1.6,
   },
-  authHelperNote: {
-    fontSize: 12,
-    color: "#5B6E6D",
-    background: "#F1F6F5",
-    border: "1px solid #DCE8E6",
-    borderRadius: 10,
-    padding: "10px 12px",
-    lineHeight: 1.6,
-  },
   authSuccessNote: {
     fontSize: 13,
     color: "#145C5C",
