@@ -36,11 +36,13 @@ import { MedCard } from "./components/MedCard";
 import { MedHistory } from "./components/MedHistory";
 import { FirstAidSection } from "./components/FirstAidSection";
 import { LogSection } from "./components/LogSection";
+import { TodayView } from "./components/TodayView";
 import { Modal } from "./components/Modal";
 import { SimpleForm } from "./components/forms/SimpleForm";
 import { AddMedForm } from "./components/forms/AddMedForm";
 import { AddBatchForm } from "./components/forms/AddBatchForm";
 import { WithdrawForm } from "./components/forms/WithdrawForm";
+import { AdjustBatchQtyForm } from "./components/forms/AdjustBatchQtyForm";
 
 function LoadingScreen({ text }) {
   return (
@@ -117,6 +119,7 @@ export default function PharmacyApp() {
     deleteMedication,
     addBatch,
     deleteBatch,
+    adjustBatchQty,
     withdrawStock,
     quickWithdrawOne,
     addFirstAid,
@@ -151,6 +154,7 @@ export default function PharmacyApp() {
   const [historyModalMed, setHistoryModalMed] = useState(null);
   const [showAddFirstAid, setShowAddFirstAid] = useState(false);
   const [editFirstAidItem, setEditFirstAidItem] = useState(null);
+  const [adjustQtyTarget, setAdjustQtyTarget] = useState(null); // { med, batch }
 
   if (!configured) return <NotConfiguredScreen />;
   if (authLoading) return <LoadingScreen text="جارٍ التحقق من الجلسة…" />;
@@ -219,8 +223,8 @@ export default function PharmacyApp() {
   // ---- render ----
   return (
     <div dir="rtl" style={styles.app}>
-      <header style={styles.header}>
-        <div style={styles.headerTop}>
+      <header className="app-header" style={styles.header}>
+        <div className="app-header-top" style={styles.headerTop}>
           <div style={styles.headerTitleRow}>
             <div style={styles.headerLogo}>
               <Radar size={20} color="#F6F5F1" />
@@ -230,10 +234,13 @@ export default function PharmacyApp() {
               <div style={styles.subtitle}>{L.appSubtitle}</div>
             </div>
           </div>
-          <div style={styles.authRow}>
-            <span style={styles.roleTag}>
-              {isAdmin ? <Unlock size={12} /> : <Eye size={12} />}{" "}
-              {isAdmin ? "وضع المسؤول" : "وضع الموظف"} · {user.email}
+          <div className="app-auth-row" style={styles.authRow}>
+            <span className="app-role-tag" style={styles.roleTag}>
+              <span style={styles.roleTagFixed}>
+                {isAdmin ? <Unlock size={12} /> : <Eye size={12} />}
+                {isAdmin ? "وضع المسؤول" : "وضع الموظف"} ·
+              </span>
+              <span style={styles.roleTagEmail}>{user.email}</span>
             </span>
             {isAdmin && (
               <button
@@ -253,7 +260,7 @@ export default function PharmacyApp() {
             </button>
           </div>
         </div>
-        <div style={styles.kpiRow}>
+        <div className="kpi-row" style={styles.kpiRow}>
           <Kpi
             icon={<AlertTriangle size={16} />}
             value={expiredCount}
@@ -283,6 +290,11 @@ export default function PharmacyApp() {
 
       <nav style={styles.tabs}>
         <TabButton
+          active={activeTab === "today"}
+          onClick={() => setActiveTab("today")}
+          label={L.tabToday}
+        />
+        <TabButton
           active={activeTab === "meds"}
           onClick={() => setActiveTab("meds")}
           label={L.tabMeds}
@@ -306,6 +318,20 @@ export default function PharmacyApp() {
           clinicId={clinicId}
           onDismiss={() => setMigrationDismissed(true)}
           onMigrated={refetch}
+        />
+      )}
+
+      {activeTab === "today" && (
+        <TodayView
+          categories={state.categories}
+          medications={state.medications}
+          firstAid={state.firstAid}
+          onGoToMed={(med) => {
+            setActiveTab("meds");
+            setActiveCategory(med.categoryId || "all");
+            setSearch(med.name);
+          }}
+          onGoToFirstAid={() => setActiveTab("firstaid")}
         />
       )}
 
@@ -431,6 +457,10 @@ export default function PharmacyApp() {
                           : "هل أنت متأكد من حذف هذه الدفعة؟ لا يمكن التراجع عن هذا الإجراء.",
                         () => deleteBatch(med.id, batchId),
                       );
+                    }}
+                    onAdjustBatchQty={(batchId) => {
+                      const batch = med.batches.find((b) => b.id === batchId);
+                      if (batch) setAdjustQtyTarget({ med, batch });
                     }}
                     onDeleteMed={() => {
                       const batchCount = med.batches.length;
@@ -581,6 +611,30 @@ export default function PharmacyApp() {
                 addBatch(batchModalMed.id, { expiry: v.expiry, qty: v.qty });
               setBatchModalMed(null);
             }}
+          />
+        </Modal>
+      )}
+
+      {adjustQtyTarget && (
+        <Modal
+          title={`تعديل الكمية — ${adjustQtyTarget.med.name}`}
+          onClose={() => setAdjustQtyTarget(null)}
+        >
+          <AdjustBatchQtyForm
+            medName={adjustQtyTarget.med.name}
+            batch={
+              // prefer the live batch from state (post-refetch), falling
+              // back to the one captured when the modal was opened
+              state.medications
+                .find((m) => m.id === adjustQtyTarget.med.id)
+                ?.batches.find((b) => b.id === adjustQtyTarget.batch.id) ||
+              adjustQtyTarget.batch
+            }
+            onSubmit={(newQty, reason) => {
+              adjustBatchQty(adjustQtyTarget.batch.id, newQty, reason);
+              setAdjustQtyTarget(null);
+            }}
+            onCancel={() => setAdjustQtyTarget(null)}
           />
         </Modal>
       )}

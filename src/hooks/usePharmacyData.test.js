@@ -8,6 +8,9 @@ const mockApi = vi.hoisted(() => ({
   fetchClinicData: vi.fn(),
   fetchWithdrawalLogPage: vi.fn(),
   subscribeToClinicData: vi.fn(() => () => {}),
+  createCategory: vi.fn(),
+  withdrawStock: vi.fn(),
+  saveUiLabels: vi.fn(),
 }));
 
 vi.mock("../lib/pharmacyApi", () => mockApi);
@@ -166,5 +169,131 @@ describe("usePharmacyData — withdrawal-log pagination (Improvement #7)", () =>
     });
 
     expect(mockApi.fetchWithdrawalLogPage).not.toHaveBeenCalled();
+  });
+});
+
+// Real timers (not fake ones) so this exercises the actual 300ms debounce,
+// consistent with the rest of this file's async style.
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const DEBOUNCE_SETTLE_MS = 400; // > REALTIME_REFETCH_DEBOUNCE_MS (300)
+
+describe("usePharmacyData — double-refetch fix: a local mutation's own realtime echo must not cause a second refetch", () => {
+  it("addCategory (1 table) causes exactly one refetch even after its own realtime echo arrives", async () => {
+    mockApi.fetchClinicData.mockResolvedValue(emptyDataset);
+    mockApi.createCategory.mockResolvedValue({ id: "c1", name: "مسكنات" });
+
+    const { result } = renderHook(() => usePharmacyData("clinic-1"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(mockApi.fetchClinicData).toHaveBeenCalledTimes(1); // initial load
+
+    await act(async () => {
+      await result.current.addCategory("مسكنات");
+    });
+    expect(mockApi.fetchClinicData).toHaveBeenCalledTimes(2); // the mutation's own refetch
+
+    const handlers = mockApi.subscribeToClinicData.mock.calls[0][1];
+    act(() => handlers.onCategoriesChange()); // the expected realtime echo of this write
+    await act(() => wait(DEBOUNCE_SETTLE_MS));
+
+    expect(mockApi.fetchClinicData).toHaveBeenCalledTimes(2); // NOT 3 — echo was suppressed
+  });
+
+  it("withdrawStock (2 tables) suppresses exactly its two expected echoes, no more", async () => {
+    mockApi.fetchClinicData.mockResolvedValue(emptyDataset);
+    mockApi.withdrawStock.mockResolvedValue({ id: "log-1", medId: "m1", qty: 1, date: "2026-08-20" });
+
+    const { result } = renderHook(() => usePharmacyData("clinic-1"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.withdrawStock("m1", null, 1, "2026-08-20");
+    });
+    expect(mockApi.fetchClinicData).toHaveBeenCalledTimes(2);
+
+    const handlers = mockApi.subscribeToClinicData.mock.calls[0][1];
+    // withdraw_stock() writes to BOTH batches and withdrawal_logs — both
+    // echoes must be swallowed by this ONE mutation.
+    act(() => {
+      handlers.onBatchesChange();
+      handlers.onLogChange();
+    });
+    await act(() => wait(DEBOUNCE_SETTLE_MS));
+    expect(mockApi.fetchClinicData).toHaveBeenCalledTimes(2);
+
+    // A third, genuinely unrelated realtime event (e.g. another device
+    // editing a category) is NOT covered by those two credits and must
+    // still refresh normally.
+    act(() => handlers.onCategoriesChange());
+    await act(() => wait(DEBOUNCE_SETTLE_MS));
+    expect(mockApi.fetchClinicData).toHaveBeenCalledTimes(3);
+  });
+
+  it("a change from another device (no local mutation in flight) still triggers a normal debounced refetch", async () => {
+    mockApi.fetchClinicData.mockResolvedValue(emptyDataset);
+    const { result } = renderHook(() => usePharmacyData("clinic-1"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(mockApi.fetchClinicData).toHaveBeenCalledTimes(1);
+
+    const handlers = mockApi.subscribeToClinicData.mock.calls[0][1];
+    act(() => handlers.onMedicationsChange());
+    await act(() => wait(DEBOUNCE_SETTLE_MS));
+
+    expect(mockApi.fetchClinicData).toHaveBeenCalledTimes(2);
+  });
+
+  it("saveUiLabels (a table with no realtime publication) arms no suppression at all", async () => {
+    mockApi.fetchClinicData.mockResolvedValue(emptyDataset);
+    mockApi.saveUiLabels.mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => usePharmacyData("clinic-1"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.saveUiLabels({ appTitle: "x" });
+    });
+    expect(mockApi.fetchClinicData).toHaveBeenCalledTimes(2); // its own refetch
+
+    // Nothing should have been armed, so an unrelated real event right
+    // after must refresh normally, not get silently swallowed.
+    const handlers = mockApi.subscribeToClinicData.mock.calls[0][1];
+    act(() => handlers.onCategoriesChange());
+    await act(() => wait(DEBOUNCE_SETTLE_MS));
+    expect(mockApi.fetchClinicData).toHaveBeenCalledTimes(3);
+  });
+
+  it("a failed mutation releases its suppression credit instead of leaking it", async () => {
+    mockApi.fetchClinicData.mockResolvedValue(emptyDataset);
+    mockApi.createCategory.mockRejectedValue(new Error("⚠️ هذه الفئة موجودة بالفعل."));
+
+    const { result } = renderHook(() => usePharmacyData("clinic-1"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.addCategory("مسكنات").catch(() => {});
+    });
+    // the write never committed, so no own-refetch happened either
+    expect(mockApi.fetchClinicData).toHaveBeenCalledTimes(1);
+
+    const handlers = mockApi.subscribeToClinicData.mock.calls[0][1];
+    act(() => handlers.onCategoriesChange());
+    await act(() => wait(DEBOUNCE_SETTLE_MS));
+
+    // the credit was released on failure, so this real event is NOT
+    // suppressed and refreshes normally
+    expect(mockApi.fetchClinicData).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not create a duplicate realtime subscription across the mutations above", async () => {
+    mockApi.fetchClinicData.mockResolvedValue(emptyDataset);
+    mockApi.createCategory.mockResolvedValue({ id: "c1", name: "مسكنات" });
+
+    const { result } = renderHook(() => usePharmacyData("clinic-1"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.addCategory("مسكنات");
+    });
+
+    expect(mockApi.subscribeToClinicData).toHaveBeenCalledTimes(1);
   });
 });

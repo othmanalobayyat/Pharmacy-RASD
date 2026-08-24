@@ -39,6 +39,22 @@ export function usePharmacyData(clinicId) {
   const stateRef = useRef(null);
   stateRef.current = state;
 
+  // Double-refetch fix: a local mutation already does its own immediate
+  // `refetch()` below (fast, certain feedback for the actor's own change).
+  // Realtime then also delivers that same write back as a postgres_changes
+  // event a moment later, which would otherwise trigger a SECOND, redundant
+  // refetch of data we already just loaded. Each table a mutation touches
+  // emits exactly one realtime event per write (e.g. withdrawStock's RPC
+  // touches both `batches` and `withdrawal_logs`, so exactly two events are
+  // expected), so runMutation "arms" this counter with that exact expected
+  // count right before performing the write, and the realtime handler below
+  // consumes (decrements) it one event at a time instead of scheduling a
+  // refetch — silently dropping only precisely as many events as our own
+  // mutation is known to produce. Any further event (a genuinely different
+  // device's change, or our own next mutation) is NOT covered by this and
+  // triggers a normal debounced refetch, so cross-device sync is unaffected.
+  const suppressedEchoesRef = useRef(0);
+
   const refetch = useCallback(async () => {
     if (!clinicId) return;
     try {
@@ -108,6 +124,7 @@ export function usePharmacyData(clinicId) {
       setLoadError("");
       setLogHasMore(false);
       setLogMoreError("");
+      suppressedEchoesRef.current = 0;
       return () => {
         mountedRef.current = false;
       };
@@ -126,6 +143,13 @@ export function usePharmacyData(clinicId) {
     if (!clinicId || !isSupabaseConfigured) return undefined;
 
     const scheduleRefetch = () => {
+      if (suppressedEchoesRef.current > 0) {
+        // This event is the expected realtime echo of a mutation this same
+        // device just made (and already refetched for) — consume one
+        // "credit" and skip scheduling a redundant refetch.
+        suppressedEchoesRef.current -= 1;
+        return;
+      }
       if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
       refetchTimerRef.current = setTimeout(() => {
         refetchTimerRef.current = null;
@@ -149,17 +173,26 @@ export function usePharmacyData(clinicId) {
 
   // Wrap every mutation with the same saving/error bookkeeping and an
   // immediate local refetch (don't wait for the realtime round-trip to
-  // reflect the actor's own change).
+  // reflect the actor's own change). `echoTables` is how many distinct
+  // tables this specific mutation writes to (default 1) — see
+  // suppressedEchoesRef above. Armed BEFORE the write (not after) so there
+  // is no window where a fast realtime echo could arrive and be treated as
+  // a genuine external change before we've told this hook to expect it.
   const runMutation = useCallback(
-    async (fn) => {
+    async (fn, echoTables = 1) => {
       setCloudStatus("saving");
       setError("");
+      suppressedEchoesRef.current += echoTables;
       try {
         const result = await fn();
         await refetch();
         setCloudStatus("idle");
         return result;
       } catch (e) {
+        // The write didn't (verifiably) commit, so no realtime echo for it
+        // will arrive — release the credit again rather than leaving it to
+        // wrongly swallow a later, unrelated change.
+        suppressedEchoesRef.current = Math.max(0, suppressedEchoesRef.current - echoTables);
         setCloudStatus("error");
         setError(e.message);
         throw e;
@@ -187,16 +220,27 @@ export function usePharmacyData(clinicId) {
     runMutation(() => api.createBatch(clinicId, medId, { expiry, qty }));
   const deleteBatch = (_medId, batchId) =>
     runMutation(() => api.deleteBatch(batchId));
+  // Quantity correction with an audit trail (see
+  // supabase/migrations/0014_batch_quantity_adjustments.sql) — only writes
+  // to `batches` (the audit table itself isn't realtime-subscribed), so the
+  // default echoTables=1 is correct here.
+  const adjustBatchQty = (batchId, newQty, reason) =>
+    runMutation(() => api.adjustBatchQty(batchId, newQty, reason));
 
   // ---- withdrawals (FEFO happens inside the withdraw_stock RPC) ----
+  // withdraw_stock() writes to both `batches` and `withdrawal_logs` in one
+  // transaction (see supabase/migrations/0003/0010), so realtime emits two
+  // separate change events for this one mutation — echoTables=2.
   const withdrawStock = (medId, batchId, qty, date) =>
-    runMutation(() =>
-      api.withdrawStock({
-        medicationId: medId,
-        qty,
-        withdrawnOn: date,
-        batchId: batchId || null,
-      }),
+    runMutation(
+      () =>
+        api.withdrawStock({
+          medicationId: medId,
+          qty,
+          withdrawnOn: date,
+          batchId: batchId || null,
+        }),
+      2,
     );
 
   // batchId is intentionally not resolved client-side anymore: passing
@@ -217,8 +261,12 @@ export function usePharmacyData(clinicId) {
   const deleteFirstAid = (id) => runMutation(() => api.deleteFirstAid(id));
 
   // ---- labels ----
+  // `ui_labels` is deliberately NOT in the realtime publication (see
+  // supabase/migrations/0005_realtime.sql) — no echo will ever arrive for
+  // this write, so echoTables=0 (otherwise the un-consumed credit would sit
+  // around and wrongly swallow a later, unrelated realtime event).
   const saveUiLabels = (nextLabels) =>
-    runMutation(() => api.saveUiLabels(clinicId, nextLabels));
+    runMutation(() => api.saveUiLabels(clinicId, nextLabels), 0);
 
   return {
     state,
@@ -240,6 +288,7 @@ export function usePharmacyData(clinicId) {
     deleteMedication,
     addBatch,
     deleteBatch,
+    adjustBatchQty,
     withdrawStock,
     quickWithdrawOne,
     addFirstAid,

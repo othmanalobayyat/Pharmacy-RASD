@@ -150,6 +150,60 @@ describe("withdrawStock() — atomic FEFO RPC", () => {
   });
 });
 
+describe("adjustBatchQty() — quantity correction with audit trail (0014_batch_quantity_adjustments.sql)", () => {
+  it("sends batch id, new quantity, and reason, and maps the returned (updated) batch row", async () => {
+    setRpcResult({
+      id: "batch-1",
+      medication_id: "med-1",
+      expiry: "2026-08-01",
+      qty: 50,
+      added_date: "2026-08-01",
+    });
+
+    const batch = await api.adjustBatchQty("batch-1", "50", "تصحيح خطأ عند إدخال الكمية");
+
+    expect(mockSupabase.rpc).toHaveBeenCalledWith("adjust_batch_qty", {
+      p_batch_id: "batch-1",
+      p_new_qty: 50,
+      p_reason: "تصحيح خطأ عند إدخال الكمية",
+    });
+    expect(batch).toEqual({
+      id: "batch-1",
+      medicationId: "med-1",
+      expiry: "2026-08-01",
+      qty: 50,
+      addedDate: "2026-08-01",
+    });
+  });
+
+  it("an unauthorized (non-admin) attempt is mapped to the safe permission message", async () => {
+    setRpcResult(null, { message: "only admins can adjust batch quantities", code: "42501" });
+    await expect(
+      api.adjustBatchQty("batch-1", 50, "تصحيح"),
+    ).rejects.toThrow("⚠️ ليس لديك صلاحية لتنفيذ هذا الإجراء.");
+  });
+
+  it("a nonexistent/foreign-clinic batch is mapped to the safe not-found message", async () => {
+    setRpcResult(null, { message: "batch not found in this clinic", code: "P0002" });
+    await expect(api.adjustBatchQty("nope", 50, "تصحيح")).rejects.toThrow(
+      "لم يتم العثور على العنصر المطلوب",
+    );
+  });
+
+  it("submitting the same quantity as the current one is rejected with the database's exact Arabic message", async () => {
+    setRpcResult(null, { message: "الكمية الجديدة مطابقة للكمية الحالية", code: "P0004" });
+    const err = await api.adjustBatchQty("batch-1", 500, "تصحيح").catch((e) => e);
+    expect(err.message).toBe("⚠️ الكمية الجديدة مطابقة للكمية الحالية");
+  });
+
+  it("a genuine network failure is mapped, not left as a raw error", async () => {
+    mockSupabase.rpc.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    await expect(api.adjustBatchQty("batch-1", 50, "تصحيح")).rejects.toThrow(
+      "⚠️ تعذر الاتصال بالنظام. تحقق من اتصال الإنترنت وحاول مرة أخرى.",
+    );
+  });
+});
+
 describe("adjustFirstAid() — atomic +/-1 RPC", () => {
   it("sends the delta and maps the resulting row", async () => {
     setRpcResult({ id: "fa-1", name: "شاش معقم", qty: 4, threshold: 5 });

@@ -214,6 +214,21 @@ export async function deleteBatch(id) {
   await unwrap(supabase.from("batches").delete().eq("id", id));
 }
 
+// Corrects a batch's quantity (e.g. a data-entry mistake) without deleting
+// and recreating the batch — see supabase/migrations/0014_batch_quantity_adjustments.sql
+// for the atomic RPC and its audit trail. Admin-only, enforced in the RPC
+// itself, not just by hiding the button (see the migration's own comments).
+export async function adjustBatchQty(batchId, newQty, reason) {
+  const row = await unwrap(
+    supabase.rpc("adjust_batch_qty", {
+      p_batch_id: batchId,
+      p_new_qty: Number(newQty),
+      p_reason: reason,
+    }),
+  );
+  return mapBatch(row);
+}
+
 // ---------- withdrawals (atomic FEFO RPC — see supabase/migrations/0010) ----------
 export async function withdrawStock({ medicationId, qty, withdrawnOn, batchId = null }) {
   const row = await unwrap(

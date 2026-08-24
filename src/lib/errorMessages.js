@@ -45,6 +45,11 @@ const CODE_MESSAGES = {
   // hasArabic() passthrough above handles it in practice — this entry is
   // just explicit documentation/defense-in-depth in case that ever changes.
   P0003: "لا يمكن إزالة صلاحية المسؤول عن آخر مسؤول في الصيدلية.",
+  // adjust_batch_qty() (supabase/migrations/0014_batch_quantity_adjustments.sql)
+  // raises this when the "new" quantity submitted equals the batch's current
+  // quantity — already Arabic, so hasArabic() passthrough handles it in
+  // practice; this entry is defense-in-depth documentation, same as P0003.
+  P0004: "الكمية الجديدة مطابقة للكمية الحالية.",
 };
 
 // Fallback for when there's no SQLSTATE at all (network failures, GoTrue

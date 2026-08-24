@@ -15,6 +15,7 @@ export function MedCard({
   onHistory,
   onEdit,
   onDeleteBatch,
+  onAdjustBatchQty,
   onDeleteMed,
 }) {
   // "متوفر"/"متبقية" must mean currently withdrawable, never raw physical
@@ -146,13 +147,22 @@ export function MedCard({
                   </span>
                 </div>
                 {isOwner && (
-                  <button
-                    style={styles.batchDeleteBtn}
-                    onClick={() => onDeleteBatch(b.id)}
-                    title="حذف الدفعة"
-                  >
-                    <X size={13} />
-                  </button>
+                  <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                    <button
+                      style={styles.batchDeleteBtn}
+                      onClick={() => onAdjustBatchQty(b.id)}
+                      title="تعديل الكمية"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      style={styles.batchDeleteBtn}
+                      onClick={() => onDeleteBatch(b.id)}
+                      title="حذف الدفعة"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
                 )}
               </div>
             );

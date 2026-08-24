@@ -42,6 +42,14 @@ export function isExpired(isoDate, referenceISO = todayISO()) {
   return monthKey(referenceISO) > monthKey(isoDate);
 }
 
+// True when a batch's expiry month is the SAME as the reference month (i.e.
+// "expiring this month," not yet expired) — used by the Today/triage view.
+// Reuses the same monthKey() used by isExpired() above so "this month" and
+// "expired" can never disagree about what a batch's expiry month even is.
+export function isExpiringThisMonth(isoDate, referenceISO = todayISO()) {
+  return monthKey(isoDate) === monthKey(referenceISO);
+}
+
 // Days remaining until the END of the expiry month (or a negative count of
 // days since that month ended, once expired) — used for the
 // critical/warning/ok urgency thresholds so "how urgent is this" reflects

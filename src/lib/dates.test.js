@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   isExpired,
+  isExpiringThisMonth,
   daysUntilMonthEnd,
   formatMonthYear,
   monthInputToISO,
@@ -44,6 +45,22 @@ describe("isExpired() — month/year semantics", () => {
   it("is not affected by the stored day-of-month — a legacy batch stored with day=15 still expires by month only", () => {
     expect(isExpired("2026-08-15", "2026-08-31")).toBe(false);
     expect(isExpired("2026-08-15", "2026-09-01")).toBe(true);
+  });
+});
+
+describe("isExpiringThisMonth() — used by the Today/Triage view", () => {
+  it("is true when the batch's month matches the reference month, on any day of it", () => {
+    expect(isExpiringThisMonth("2026-08-01", "2026-08-01")).toBe(true);
+    expect(isExpiringThisMonth("2026-08-01", "2026-08-31")).toBe(true);
+  });
+  it("is false for a past (already-expired) month", () => {
+    expect(isExpiringThisMonth("2026-07-01", "2026-08-15")).toBe(false);
+  });
+  it("is false for a future month", () => {
+    expect(isExpiringThisMonth("2026-09-01", "2026-08-15")).toBe(false);
+  });
+  it("is unaffected by the stored day-of-month", () => {
+    expect(isExpiringThisMonth("2026-08-17", "2026-08-01")).toBe(true);
   });
 });
 
