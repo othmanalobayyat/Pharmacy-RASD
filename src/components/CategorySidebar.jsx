@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { GripVertical, Pencil, Plus } from "lucide-react";
+import { ChevronDown, GripVertical, Pencil, Plus } from "lucide-react";
 import { styles } from "../styles/styles";
 import { moveItem } from "../lib/categoryOrder";
 
@@ -79,8 +79,58 @@ export function CategorySidebar({
       .finally(() => setSaving(false));
   };
 
+  // Currently-selected category object (for the mobile edit-category
+  // action below) — "all" has no backing row, so this is null in that case.
+  const selectedCategory = localOrder.find((c) => c.id === activeCategory) || null;
+
   return (
-    <aside className="pharmacy-sidebar" style={styles.sidebar}>
+    <>
+      {/* Mobile-only dropdown replacement for the horizontal category
+          strip below — see global.css .category-mobile-select (hidden by
+          default, shown only at the mobile breakpoint; the strip itself is
+          hidden there instead). Same state/handlers as the desktop strip,
+          just a different control — no separate filter logic. */}
+      <div className="category-mobile-select" style={styles.categoryMobileSelect}>
+        <label style={styles.label} htmlFor="category-mobile-select">
+          الفئة
+          <div style={styles.selectWrap}>
+            <select
+              id="category-mobile-select"
+              style={styles.select}
+              value={activeCategory}
+              onChange={(e) => onSelectCategory(e.target.value)}
+              aria-label="اختيار فئة الأدوية"
+            >
+              <option value="all">
+                {L.sidebarAll} ({medications.length})
+              </option>
+              {localOrder.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({medications.filter((m) => m.categoryId === c.id).length})
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={15} style={styles.selectChevron} />
+          </div>
+        </label>
+        {isOwner && (
+          <div style={styles.categoryMobileActions}>
+            {selectedCategory && (
+              <button
+                style={{ ...styles.secondaryBtn, flex: "none" }}
+                onClick={() => onEditCategory(selectedCategory)}
+              >
+                <Pencil size={13} /> تعديل اسم الفئة
+              </button>
+            )}
+            <button style={{ ...styles.secondaryBtn, flex: "none" }} onClick={onAddCategory}>
+              <Plus size={13} /> {L.addCategoryBtn}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <aside className="pharmacy-sidebar" style={styles.sidebar}>
       <button
         style={styles.sideItem(activeCategory === "all")}
         onClick={() => onSelectCategory("all")}
@@ -142,5 +192,6 @@ export function CategorySidebar({
         </button>
       )}
     </aside>
+    </>
   );
 }

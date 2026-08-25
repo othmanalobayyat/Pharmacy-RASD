@@ -69,8 +69,59 @@ describe("CategorySidebar — existing behavior preserved", () => {
   it("the add-category button still calls onAddCategory", () => {
     const onAddCategory = vi.fn();
     render(<CategorySidebar {...baseProps({ onAddCategory })} />);
-    fireEvent.click(screen.getByText("فئة جديدة"));
+    // Two "فئة جديدة" buttons now exist in the DOM at once — the existing
+    // desktop strip's and the new mobile dropdown's, toggled between by CSS
+    // (jsdom doesn't evaluate media queries, so both are present here).
+    const [desktopBtn] = screen.getAllByText("فئة جديدة");
+    fireEvent.click(desktopBtn);
     expect(onAddCategory).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("CategorySidebar — mobile dropdown replacement (same state/handlers as the desktop strip)", () => {
+  it("renders a select with 'كل الأدوية' plus every category, each showing its own count", () => {
+    render(<CategorySidebar {...baseProps()} />);
+    const select = screen.getByLabelText("اختيار فئة الأدوية");
+    const options = Array.from(select.querySelectorAll("option")).map((o) => o.textContent);
+    expect(options).toEqual([
+      "كل الأدوية (3)",
+      "مسكنات (2)",
+      "مضادات حيوية (1)",
+      "سكري (0)",
+    ]);
+  });
+
+  it("the select's value reflects the currently active category", () => {
+    render(<CategorySidebar {...baseProps({ activeCategory: "c2" })} />);
+    expect(screen.getByLabelText("اختيار فئة الأدوية").value).toBe("c2");
+  });
+
+  it("choosing a different option calls the SAME onSelectCategory handler as the desktop strip", () => {
+    const onSelectCategory = vi.fn();
+    render(<CategorySidebar {...baseProps({ onSelectCategory })} />);
+    fireEvent.change(screen.getByLabelText("اختيار فئة الأدوية"), {
+      target: { value: "c3" },
+    });
+    expect(onSelectCategory).toHaveBeenCalledWith("c3");
+  });
+
+  it("an admin can edit the currently-selected category from the mobile control", () => {
+    const onEditCategory = vi.fn();
+    render(<CategorySidebar {...baseProps({ activeCategory: "c1", onEditCategory })} />);
+    fireEvent.click(screen.getByText("تعديل اسم الفئة"));
+    expect(onEditCategory).toHaveBeenCalledWith(categories[0]);
+  });
+
+  it("no edit-category action is shown when 'كل الأدوية' is selected", () => {
+    render(<CategorySidebar {...baseProps({ activeCategory: "all" })} />);
+    expect(screen.queryByText("تعديل اسم الفئة")).toBeNull();
+  });
+
+  it("staff sees the dropdown (read-only selection) but no edit/add actions", () => {
+    render(<CategorySidebar {...baseProps({ isOwner: false, activeCategory: "c1" })} />);
+    expect(screen.getByLabelText("اختيار فئة الأدوية")).toBeTruthy();
+    expect(screen.queryByText("تعديل اسم الفئة")).toBeNull();
+    expect(screen.queryByText("فئة جديدة")).toBeNull();
   });
 });
 

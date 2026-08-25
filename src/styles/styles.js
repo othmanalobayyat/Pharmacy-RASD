@@ -499,6 +499,21 @@ export const styles = {
     color: "#7C918F",
     pointerEvents: "none",
   },
+  // Mobile-only category filter (replaces the horizontal category strip —
+  // see CategorySidebar.jsx / global.css .category-mobile-select). Hidden
+  // by default via CSS; shown only at the mobile breakpoint. Reuses the
+  // exact same white-card/border/radius language as the rest of the app.
+  categoryMobileSelect: {
+    flexDirection: "column",
+    gap: 8,
+    background: "#fff",
+    border: "1px solid #DCE8E6",
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+    width: "100%",
+  },
+  categoryMobileActions: { display: "flex", gap: 8, flexWrap: "wrap" },
   historySummaryRow: {
     display: "flex",
     gap: 10,

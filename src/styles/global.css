@@ -174,21 +174,23 @@ button:focus-visible {
   }
 }
 
+/* Category filter/navigation: a clean dropdown replaces the horizontal
+   category strip on mobile — same underlying state/handlers
+   (CategorySidebar.jsx), just a different control per breakpoint. Hidden
+   on desktop/tablet by default; the strip stays exactly as it is there. */
+.category-mobile-select {
+  display: none;
+}
+
 @media (max-width: 760px) {
   .pharmacy-body {
     flex-direction: column !important;
   }
   .pharmacy-sidebar {
-    width: 100% !important;
-    flex-direction: row !important;
-    overflow-x: auto !important;
-    flex-wrap: nowrap !important;
-    -webkit-overflow-scrolling: touch;
+    display: none !important;
   }
-  .pharmacy-sidebar > button,
-  .pharmacy-sidebar > div {
-    white-space: nowrap;
-    flex-shrink: 0;
+  .category-mobile-select {
+    display: flex !important;
   }
   .pharmacy-main {
     width: 100% !important;
