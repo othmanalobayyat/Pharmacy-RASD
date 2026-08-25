@@ -9,15 +9,18 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 // feature actually changed.
 const mockUseAuth = vi.hoisted(() => vi.fn());
 const mockUsePharmacyData = vi.hoisted(() => vi.fn());
-// DailyLogView (سجل الصرف اليومي) self-fetches from pharmacyApi directly,
-// the same way MedHistory already does — mock just that one function so
-// mounting the tab in these tests never hits a real network call.
+// DailyLogView (سجل الصرف اليومي) and LogSection (سجلّ الصرف, grouped) both
+// self-fetch from pharmacyApi directly, the same way MedHistory already
+// does — mock just those two functions so mounting either tab in these
+// tests never hits a real network call.
 const mockFetchWithdrawalLogForDate = vi.hoisted(() => vi.fn(() => new Promise(() => {})));
+const mockFetchAllWithdrawalLogs = vi.hoisted(() => vi.fn(() => new Promise(() => {})));
 
 vi.mock("./hooks/useAuth", () => ({ useAuth: mockUseAuth }));
 vi.mock("./hooks/usePharmacyData", () => ({ usePharmacyData: mockUsePharmacyData }));
 vi.mock("./lib/pharmacyApi", () => ({
   fetchWithdrawalLogForDate: mockFetchWithdrawalLogForDate,
+  fetchAllWithdrawalLogs: mockFetchAllWithdrawalLogs,
 }));
 
 const { default: PharmacyApp } = await import("./App");
@@ -194,32 +197,26 @@ describe("KPI cards — clickable dashboard shortcuts", () => {
 });
 
 describe("navigation — سجل الصرف اليومي is a new tab, existing tabs are untouched", () => {
-  it("the existing 'سجلّ الصرف' tab still renders the global log exactly as before", () => {
-    mockUsePharmacyData.mockReturnValue(
-      pharmacyDataMock({
-        state: {
-          ...baseState,
-          log: [
-            {
-              id: "log-1",
-              medId: "m-ok",
-              medName: "دواء سليم المخزون",
-              batchId: "b3",
-              expiry: FAR_FUTURE_MONTH,
-              qty: 4,
-              date: "2026-08-10",
-              performedByEmail: "staff@clinic.test",
-            },
-          ],
-        },
-      }),
-    );
+  it("the existing 'سجلّ الصرف' tab still opens (now showing the grouped-by-medication overview)", async () => {
+    mockFetchAllWithdrawalLogs.mockResolvedValueOnce([
+      {
+        id: "log-1",
+        medId: "m-ok",
+        medName: "دواء سليم المخزون",
+        batchId: "b3",
+        expiry: FAR_FUTURE_MONTH,
+        qty: 4,
+        date: "2026-08-10",
+        createdAt: "2026-08-10T10:00:00.000Z",
+        performedByEmail: "staff@clinic.test",
+      },
+    ]);
     render(<PharmacyApp />);
 
     fireEvent.click(screen.getByText("سجلّ الصرف"));
 
-    expect(screen.getByText("دواء سليم المخزون")).toBeTruthy();
-    expect(screen.getByText("staff@clinic.test")).toBeTruthy();
+    expect(await screen.findByText("دواء سليم المخزون")).toBeTruthy();
+    expect(screen.getByText("عدد مرات الصرف: 1")).toBeTruthy();
   });
 
   it("a new 'سجل الصرف اليومي' tab exists alongside الأدوية/الإسعافات الأولية/سجلّ الصرف and opens the daily view", () => {

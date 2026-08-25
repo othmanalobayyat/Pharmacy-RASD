@@ -536,6 +536,33 @@ export const styles = {
     borderTop: "1px solid #EEF3F2",
     whiteSpace: "nowrap",
   },
+  // Grouped "سجل الصرف" overview — one card per medication. Sized/shaped
+  // like the existing medCard (same radius/border/padding) since it sits in
+  // the same medGrid layout as the Meds tab, just rendered as a <button>.
+  logGroupCard: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+    background: "#fff",
+    border: "1px solid #DCE8E6",
+    borderRadius: 14,
+    padding: 14,
+    textAlign: "right",
+    fontFamily: "inherit",
+    cursor: "pointer",
+    width: "100%",
+  },
+  logGroupName: { fontWeight: 800, fontSize: 15, wordBreak: "break-word" },
+  logGroupMeta: { fontSize: 12.5, color: "#5B6E6D" },
+  logGroupCta: {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    fontSize: 11.5,
+    color: "#145C5C",
+    fontWeight: 700,
+    marginTop: 4,
+  },
   settingsSectionTitle: {
     fontWeight: 800,
     fontSize: 13.5,

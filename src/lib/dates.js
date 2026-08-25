@@ -91,6 +91,14 @@ export function formatMonthYear(isoDate) {
   return `${month}/${year}`;
 }
 
+// "2026-08-25" -> "25/08/2026" — for WITHDRAWAL date displays (day
+// precision), never for medication expiry, which is always month/year only
+// and must keep using formatMonthYear() above instead.
+export function formatFullDate(isoDate) {
+  const [year, month, day] = isoDate.split("-");
+  return `${day}/${month}/${year}`;
+}
+
 // The value a native <input type="month"> produces ("2026-08") -> the
 // day-01 ISO date this app stores ("2026-08-01").
 export function monthInputToISO(monthValue) {

@@ -128,10 +128,6 @@ export default function PharmacyApp() {
     adjustFirstAid,
     deleteFirstAid,
     saveUiLabels,
-    logHasMore,
-    loadingMoreLog,
-    logMoreError,
-    loadMoreLog,
     logRefreshTick,
   } = usePharmacyData(clinicId);
 
@@ -601,16 +597,7 @@ export default function PharmacyApp() {
         </>
       )}
 
-      {activeTab === "log" && (
-        <LogSection
-          L={L}
-          log={state.log}
-          hasMore={logHasMore}
-          loadingMore={loadingMoreLog}
-          loadMoreError={logMoreError}
-          onLoadMore={loadMoreLog}
-        />
-      )}
+      {activeTab === "log" && <LogSection L={L} refreshSignal={logRefreshTick} />}
 
       {activeTab === "dailyLog" && <DailyLogView refreshSignal={logRefreshTick} />}
 

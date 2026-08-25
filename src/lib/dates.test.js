@@ -8,7 +8,17 @@ import {
   isoToMonthInput,
   todayISO,
   addDays,
+  formatFullDate,
 } from "./dates";
+
+describe("formatFullDate() — for WITHDRAWAL date displays (day precision), never for expiry", () => {
+  it("formats an ISO date as DD/MM/YYYY", () => {
+    expect(formatFullDate("2026-08-25")).toBe("25/08/2026");
+  });
+  it("keeps a single-digit day/month zero-padded as stored", () => {
+    expect(formatFullDate("2026-01-05")).toBe("05/01/2026");
+  });
+});
 
 describe("addDays() — used by the daily withdrawal log's prev/next/today navigation", () => {
   it("moves forward by a positive delta", () => {

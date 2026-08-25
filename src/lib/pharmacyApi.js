@@ -100,6 +100,24 @@ export async function fetchWithdrawalLogPage(offset, limit = LOG_PAGE_SIZE) {
   return { logs: rows.slice(0, limit).map(mapLog), hasMore: rows.length > limit };
 }
 
+// The full withdrawal history — used by the grouped "سجل الصرف" view
+// (LogSection.jsx), which groups by medication and needs an accurate
+// per-medication operation COUNT. That count would be wrong/incomplete if
+// computed from the paginated global window (fetchWithdrawalLogPage/
+// state.log, which only ever holds its most-recently-loaded page), so this
+// fetches every row directly, once — the same already-loaded rows are then
+// reused client-side for a medication's detail list on click, so clicking
+// between medications never re-fetches. At this app's current scale this is
+// a small, bounded query; if a clinic's history grows very large, this
+// specific view would need a real server-side aggregate instead of client-
+// side grouping — out of scope for now.
+export async function fetchAllWithdrawalLogs() {
+  const rows = await unwrap(
+    supabase.from("withdrawal_logs").select("*").order("created_at", { ascending: false }),
+  );
+  return rows.map(mapLog);
+}
+
 // A single medication's withdrawal history, queried directly from the
 // database (not filtered client-side out of the paginated global log — the
 // global log only ever holds the currently-loaded page, so filtering it

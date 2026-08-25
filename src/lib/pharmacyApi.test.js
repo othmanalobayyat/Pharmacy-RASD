@@ -368,6 +368,49 @@ describe("fetchWithdrawalLogPage() — the withdrawal log is paginated at the DB
   });
 });
 
+describe("fetchAllWithdrawalLogs() — used by the grouped سجل الصرف view", () => {
+  it("orders newest-first and maps every row, including createdAt", async () => {
+    setChainResult([
+      {
+        id: "log-1",
+        medication_id: "med-1",
+        med_name: "بنادول",
+        batch_id: "batch-1",
+        expiry: "2026-09-01",
+        qty: 2,
+        withdrawn_on: "2026-08-20",
+        created_at: "2026-08-20T10:35:00.000Z",
+        performed_by_email: "staff@clinic.test",
+      },
+    ]);
+
+    const result = await api.fetchAllWithdrawalLogs();
+
+    expect(mockSupabase.from).toHaveBeenCalledWith("withdrawal_logs");
+    expect(chain.order).toHaveBeenCalledWith("created_at", { ascending: false });
+    expect(result).toEqual([
+      {
+        id: "log-1",
+        medId: "med-1",
+        medName: "بنادول",
+        batchId: "batch-1",
+        expiry: "2026-09-01",
+        qty: 2,
+        date: "2026-08-20",
+        createdAt: "2026-08-20T10:35:00.000Z",
+        performedByEmail: "staff@clinic.test",
+      },
+    ]);
+  });
+
+  it("a failure is mapped, not a raw Postgres error", async () => {
+    setChainResult(null, { message: "could not connect to server" });
+    await expect(api.fetchAllWithdrawalLogs()).rejects.toThrow(
+      "⚠️ حدث خطأ غير متوقع. حاول مرة أخرى، وإذا استمرت المشكلة تواصل مع الدعم الفني.",
+    );
+  });
+});
+
 describe("fetchWithdrawalLogForDate() — سجل الصرف اليومي queries the database directly for the exact day", () => {
   it("filters by withdrawn_on at the database level and maps every row, including createdAt for the time-of-day display", () => {
     setChainResult([
