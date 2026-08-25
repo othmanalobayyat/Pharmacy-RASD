@@ -35,7 +35,7 @@ async function unwrap(supabaseCall, entity) {
 }
 
 // ---------- mappers ----------
-const mapCategory = (r) => ({ id: r.id, name: r.name });
+const mapCategory = (r) => ({ id: r.id, name: r.name, sortOrder: r.sort_order });
 const mapBatch = (r) => ({
   id: r.id,
   medicationId: r.medication_id,
@@ -160,7 +160,16 @@ export async function fetchWithdrawalLogForDate(dateISO) {
 export async function fetchClinicData(logLimit = LOG_PAGE_SIZE) {
   const [categories, medicationRows, batches, firstAid, logPage, labelRows] = await Promise.all([
     unwrap(
-      supabase.from("categories").select("*").order("created_at", { ascending: true }),
+      // sort_order is the single source of truth for display order (see
+      // supabase/migrations/0015_category_sort_order.sql) — never
+      // created_at/uuid/alphabetical. created_at/id stay as tiebreakers only
+      // for legacy rows that could still share an exact sort_order.
+      supabase
+        .from("categories")
+        .select("*")
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true }),
       "category",
     ).then((rows) => rows.map(mapCategory)),
     unwrap(
@@ -208,6 +217,20 @@ export async function updateCategory(id, name) {
 
 export async function deleteCategory(id) {
   await unwrap(supabase.from("categories").delete().eq("id", id));
+}
+
+// Persists a drag-and-drop reorder atomically — see
+// supabase/migrations/0015_category_sort_order.sql reorder_categories().
+// `orderedCategoryIds` must be the clinic's FULL current category id list,
+// in the new desired order; the RPC itself (not this function, and not the
+// client) is what verifies the caller is an admin and that every id
+// actually belongs to their clinic — no clinic_id is sent from here at all.
+export async function reorderCategories(orderedCategoryIds) {
+  const rows = await unwrap(
+    supabase.rpc("reorder_categories", { p_category_ids: orderedCategoryIds }),
+    "category",
+  );
+  return rows.map(mapCategory);
 }
 
 // ---------- medications ----------

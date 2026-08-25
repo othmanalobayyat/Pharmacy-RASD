@@ -233,6 +233,19 @@ export const styles = {
     padding: 4,
     flexShrink: 0,
   },
+  // Category drag handle (admin-only) — deliberately a separate small
+  // control from the category button itself, so pressing/dragging it can
+  // never be confused with a normal category-select click.
+  dragHandle: {
+    border: "none",
+    background: "none",
+    color: "#B7C7C5",
+    cursor: "grab",
+    padding: 4,
+    flexShrink: 0,
+    display: "flex",
+    touchAction: "none",
+  },
   countBadge: { fontSize: 11, color: "#7C918F" },
   addCategoryBtn: {
     display: "flex",

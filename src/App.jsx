@@ -6,7 +6,6 @@ import {
   Search,
   ShieldPlus,
   Layers,
-  Pencil,
   CalendarDays,
   Radar,
   Settings,
@@ -32,6 +31,7 @@ import { Kpi } from "./components/Kpi";
 import { TabButton } from "./components/TabButton";
 import { EmptyState } from "./components/EmptyState";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { CategorySidebar } from "./components/CategorySidebar";
 import { MedCard } from "./components/MedCard";
 import { MedHistory } from "./components/MedHistory";
 import { FirstAidSection } from "./components/FirstAidSection";
@@ -115,6 +115,7 @@ export default function PharmacyApp() {
     refetch,
     addCategory,
     editCategory,
+    reorderCategories,
     addMedication,
     editMedication,
     deleteMedication,
@@ -395,54 +396,20 @@ export default function PharmacyApp() {
 
       {activeTab === "meds" && (
         <div className="pharmacy-body" style={styles.body}>
-          <aside className="pharmacy-sidebar" style={styles.sidebar}>
-            <button
-              style={styles.sideItem(activeCategory === "all")}
-              onClick={() => {
-                setActiveCategory("all");
-                clearMedFilter();
-              }}
-            >
-              {L.sidebarAll}
-              <span style={styles.countBadge}>{state.medications.length}</span>
-            </button>
-            {state.categories.map((c) => (
-              <div key={c.id} style={styles.sideItemRow}>
-                <button
-                  style={{
-                    ...styles.sideItem(activeCategory === c.id),
-                    flex: 1,
-                  }}
-                  onClick={() => setActiveCategory(c.id)}
-                >
-                  {c.name}
-                  <span style={styles.countBadge}>
-                    {
-                      state.medications.filter((m) => m.categoryId === c.id)
-                        .length
-                    }
-                  </span>
-                </button>
-                {isOwner && (
-                  <button
-                    style={styles.editPencil}
-                    onClick={() => setEditCategoryItem(c)}
-                    title="تعديل اسم الفئة"
-                  >
-                    <Pencil size={12} />
-                  </button>
-                )}
-              </div>
-            ))}
-            {isOwner && (
-              <button
-                style={styles.addCategoryBtn}
-                onClick={() => setShowAddCategory(true)}
-              >
-                <Plus size={14} /> {L.addCategoryBtn}
-              </button>
-            )}
-          </aside>
+          <CategorySidebar
+            L={L}
+            categories={state.categories}
+            activeCategory={activeCategory}
+            medications={state.medications}
+            isOwner={isOwner}
+            onSelectCategory={(id) => {
+              setActiveCategory(id);
+              if (id === "all") clearMedFilter();
+            }}
+            onEditCategory={(c) => setEditCategoryItem(c)}
+            onAddCategory={() => setShowAddCategory(true)}
+            onReorder={reorderCategories}
+          />
 
           <main className="pharmacy-main" style={styles.main}>
             {medFilter !== "all" && (

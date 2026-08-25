@@ -48,7 +48,48 @@ describe("createCategory()", () => {
       clinic_id: "clinic-1",
       name: "مسكنات",
     });
+    // Deliberately no sort_order in the insert payload — new categories are
+    // placed at the end automatically by the DB trigger
+    // (supabase/migrations/0015_category_sort_order.sql
+    // set_category_sort_order()), never computed client-side.
+    expect(chain.insert.mock.calls[0][0]).not.toHaveProperty("sort_order");
     expect(result).toEqual({ id: "uuid-1", name: "مسكنات" });
+  });
+});
+
+describe("reorderCategories() — atomic drag-and-drop persistence (0015_category_sort_order.sql)", () => {
+  it("calls reorder_categories with the full ordered id list and maps the returned rows", async () => {
+    setRpcResult([
+      { id: "c2", name: "مضادات حيوية", sort_order: 1 },
+      { id: "c1", name: "مسكنات", sort_order: 2 },
+    ]);
+
+    const result = await api.reorderCategories(["c2", "c1"]);
+
+    expect(mockSupabase.rpc).toHaveBeenCalledWith("reorder_categories", {
+      p_category_ids: ["c2", "c1"],
+    });
+    expect(result).toEqual([
+      { id: "c2", name: "مضادات حيوية", sortOrder: 1 },
+      { id: "c1", name: "مسكنات", sortOrder: 2 },
+    ]);
+  });
+
+  it("a non-admin rejection is mapped to the safe permission message", async () => {
+    setRpcResult(null, { message: "only admins can reorder categories", code: "42501" });
+    await expect(api.reorderCategories(["c1", "c2"])).rejects.toThrow(
+      "⚠️ ليس لديك صلاحية لتنفيذ هذا الإجراء.",
+    );
+  });
+
+  it("a foreign/partial category id list rejection is mapped, not a raw Postgres error", async () => {
+    setRpcResult(null, {
+      message: "one or more category ids do not belong to this clinic",
+      code: "42501",
+    });
+    const err = await api.reorderCategories(["c1", "not-mine"]).catch((e) => e);
+    expect(err.message).toBe("⚠️ ليس لديك صلاحية لتنفيذ هذا الإجراء.");
+    expect(err.message).not.toMatch(/postgres|sql|clinic/i);
   });
 });
 
@@ -365,6 +406,12 @@ describe("fetchWithdrawalLogPage() — the withdrawal log is paginated at the DB
     setChainResult([]);
     await api.fetchClinicData(150);
     expect(chain.range).toHaveBeenCalledWith(0, 150);
+  });
+
+  it("categories are always ordered by sort_order — never created_at/uuid/alphabetical alone", async () => {
+    setChainResult([]);
+    await api.fetchClinicData();
+    expect(chain.order).toHaveBeenCalledWith("sort_order", { ascending: true });
   });
 });
 

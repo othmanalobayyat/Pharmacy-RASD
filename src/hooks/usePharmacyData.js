@@ -206,6 +206,10 @@ export function usePharmacyData(clinicId) {
     runMutation(() => api.createCategory(clinicId, name));
   const editCategory = (id, name) =>
     runMutation(() => api.updateCategory(id, name));
+  // Drag-and-drop reorder — only writes to `categories`, so the default
+  // echoTables=1 is correct here (same as addCategory/editCategory above).
+  const reorderCategories = (orderedCategoryIds) =>
+    runMutation(() => api.reorderCategories(orderedCategoryIds));
 
   // ---- medications ----
   const addMedication = ({ name, categoryId }) =>
@@ -283,6 +287,7 @@ export function usePharmacyData(clinicId) {
     logRefreshTick,
     addCategory,
     editCategory,
+    reorderCategories,
     addMedication,
     editMedication,
     deleteMedication,
