@@ -66,14 +66,111 @@ button:focus-visible {
     max-width: none !important;
     flex: 1 1 auto !important;
   }
+  /* 5 KPI cards, final approved mobile hierarchy:
+     row 1 — FOUR small status cards, equal size/height: منتهية الصلاحية،
+             أقل من شهر، مواد الإسعاف على الرف، قاربت الكمية على الانتهاء
+             (DOM order is 1,2,3,5 — nth-child(5) is pulled up next to the
+             other three status cards via `order`, see below);
+     row 2 — "الأدوية المسجلة" (nth-child 4) ALONE, full width — the one
+             prominent/primary card, pushed after the four status cards via
+             `order` and given a visual emphasis boost (bigger icon/number)
+             on top of the extra room.
+     `order` only changes VISUAL position, not DOM/nth-child indexing, so
+     nth-child(4)/(5) below still correctly target the same two cards.
+     Grid row-track sizing already stretches every card in a row to match
+     the tallest sibling, so long wrapped labels can't make one card look
+     oddly taller than its row-mates. */
   .kpi-row {
     display: grid !important;
-    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-columns: repeat(4, 1fr) !important;
     gap: 8px !important;
     margin-top: 10px !important;
   }
+  .kpi-row .kpi-card:nth-child(5) {
+    order: 4 !important;
+  }
   .kpi-row .kpi-card:nth-child(4) {
+    order: 5 !important;
     grid-column: 1 / -1 !important;
+    padding: 14px 16px !important;
+  }
+  .kpi-row .kpi-card:nth-child(4) .kpi-icon-wrap {
+    width: 36px !important;
+    height: 36px !important;
+  }
+  .kpi-row .kpi-card:nth-child(4) .kpi-value {
+    font-size: 24px !important;
+  }
+  .kpi-row .kpi-card:nth-child(4) .kpi-label {
+    font-size: 12px !important;
+  }
+
+  /* Extremely narrow phones (≈320px): 4 equal columns leaves too little
+     room per card, so fall back to 2x2 for the status cards. The `order`
+     values above are unchanged, so the grouping (4 small, then the large
+     card) stays exactly the same — only the column count changes. */
+  @media (max-width: 360px) {
+    .kpi-row {
+      grid-template-columns: repeat(2, 1fr) !important;
+    }
+  }
+
+  /* Center every card's content (icon on top, number, then label) instead
+     of the desktop's side-by-side icon+text row — consistent alignment,
+     no label pushed against an edge, no awkward empty space at narrow
+     widths. Desktop/tablet keep the existing side-by-side layout untouched. */
+  .kpi-row .kpi-card {
+    flex-direction: column !important;
+    justify-content: center !important;
+    text-align: center !important;
+    gap: 6px !important;
+  }
+  .kpi-row .kpi-card .kpi-text-wrap {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+}
+
+/* سجل الصرف — main grouped table, mobile only. Desktop/tablet keep the
+   existing auto-layout table (default table-layout, untouched) — these
+   rules exist purely to stop the medication-name column from being
+   squeezed to near-zero width by the other (nowrap) columns on a narrow
+   phone, which is what forced names to wrap character-by-character. Fixed
+   layout + explicit column shares means the name gets guaranteed room and
+   wraps across normal word/line boundaries instead. */
+@media (max-width: 480px) {
+  .log-main-table {
+    table-layout: fixed !important;
+    min-width: 0 !important;
+  }
+  .log-main-table th,
+  .log-main-table td {
+    white-space: normal !important;
+    padding: 8px 6px !important;
+    font-size: 12px !important;
+  }
+  .log-main-table th:nth-child(1),
+  .log-main-table td:nth-child(1) {
+    width: 40%;
+  }
+  .log-main-table th:nth-child(2),
+  .log-main-table td:nth-child(2) {
+    width: 14%;
+  }
+  .log-main-table th:nth-child(3),
+  .log-main-table td:nth-child(3) {
+    width: 22%;
+  }
+  .log-main-table th:nth-child(4),
+  .log-main-table td:nth-child(4) {
+    width: 24%;
+  }
+  /* The expand button becomes icon-only (its aria-label keeps it
+     accessible) to free up room for the medication-name column. */
+  .log-expand-btn-label {
+    display: none;
   }
 }
 

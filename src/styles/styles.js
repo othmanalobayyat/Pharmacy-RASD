@@ -528,6 +528,7 @@ export const styles = {
     border: "1px solid #DCE8E6",
     borderRadius: 14,
     overflow: "auto",
+    maxWidth: "100%",
   },
   logTable: {
     width: "100%",

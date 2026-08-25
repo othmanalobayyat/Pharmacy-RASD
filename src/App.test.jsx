@@ -196,6 +196,124 @@ describe("KPI cards — clickable dashboard shortcuts", () => {
   });
 });
 
+describe("KPI — 'قاربت الكمية على الانتهاء' (available quantity < 5, using medAvailableQty())", () => {
+  const med4Available = {
+    id: "m-4-avail",
+    name: "دواء بأربع وحدات",
+    categoryId: "cat1",
+    batches: [{ id: "b1", expiry: FAR_FUTURE_MONTH, qty: 4 }],
+  };
+  const med1Available = {
+    id: "m-1-avail",
+    name: "دواء بوحدة واحدة",
+    categoryId: "cat1",
+    batches: [{ id: "b1", expiry: FAR_FUTURE_MONTH, qty: 1 }],
+  };
+  const med5Available = {
+    id: "m-5-avail",
+    name: "دواء بخمس وحدات",
+    categoryId: "cat1",
+    batches: [{ id: "b1", expiry: FAR_FUTURE_MONTH, qty: 5 }],
+  };
+  const medZeroAvailable = {
+    id: "m-zero-avail",
+    name: "دواء بدون كمية",
+    categoryId: "cat1",
+    batches: [],
+  };
+  const medMixedValidExpired = {
+    id: "m-mixed",
+    name: "دواء بمخزون مختلط",
+    categoryId: "cat1",
+    // 4 valid + 20 expired -> available is 4 (< 5) -> included
+    batches: [
+      { id: "b-valid", expiry: FAR_FUTURE_MONTH, qty: 4 },
+      { id: "b-expired", expiry: LAST_MONTH, qty: 20 },
+    ],
+  };
+  const medExpiredOnly = {
+    id: "m-expired-only",
+    name: "دواء منتهي بالكامل",
+    categoryId: "cat1",
+    // 0 valid + 10 expired -> available is 0 -> excluded
+    batches: [{ id: "b-expired", expiry: LAST_MONTH, qty: 10 }],
+  };
+
+  it("includes medications with 4, 1, mixed-valid-4, but excludes 5-available, 0-available, and expired-only", () => {
+    mockUsePharmacyData.mockReturnValue(
+      pharmacyDataMock({
+        state: {
+          ...baseState,
+          medications: [
+            med4Available,
+            med1Available,
+            med5Available,
+            medZeroAvailable,
+            medMixedValidExpired,
+            medExpiredOnly,
+          ],
+        },
+      }),
+    );
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByRole("button", { name: /قاربت الكمية على الانتهاء/ }));
+
+    // included: available quantity is 1..4
+    expect(screen.getByText("دواء بأربع وحدات")).toBeTruthy();
+    expect(screen.getByText("دواء بوحدة واحدة")).toBeTruthy();
+    // mixed valid+expired must use ONLY the valid (available) quantity
+    expect(screen.getByText("دواء بمخزون مختلط")).toBeTruthy();
+
+    // excluded: 5 or more available
+    expect(screen.queryByText("دواء بخمس وحدات")).toBeNull();
+    // excluded: 0 available (no batches at all)
+    expect(screen.queryByText("دواء بدون كمية")).toBeNull();
+    // excluded: fully expired -> 0 available, expired stock must not count
+    expect(screen.queryByText("دواء منتهي بالكامل")).toBeNull();
+  });
+
+  it("the KPI's own count matches exactly the included set (not total medications, not expired units)", () => {
+    mockUsePharmacyData.mockReturnValue(
+      pharmacyDataMock({
+        state: {
+          ...baseState,
+          medications: [
+            med4Available,
+            med1Available,
+            med5Available,
+            medZeroAvailable,
+            medMixedValidExpired,
+            medExpiredOnly,
+          ],
+        },
+      }),
+    );
+    render(<PharmacyApp />);
+    const kpiBtn = screen.getByRole("button", { name: /قاربت الكمية على الانتهاء/ });
+    // 3 qualify: med4Available, med1Available, medMixedValidExpired
+    expect(kpiBtn.getAttribute("aria-label")).toContain("3");
+  });
+
+  it("shows the existing empty state when nothing is low on available stock", () => {
+    mockUsePharmacyData.mockReturnValue(
+      pharmacyDataMock({ state: { ...baseState, medications: [med5Available] } }),
+    );
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByRole("button", { name: /قاربت الكمية على الانتهاء/ }));
+
+    expect(screen.getByText("لا يوجد أدوية قاربت على النفاد")).toBeTruthy();
+  });
+
+  it("does not change the meaning of the other existing KPIs", () => {
+    render(<PharmacyApp />);
+    // medOk in the default fixture has exactly 5 available units (a
+    // boundary case) — it must still show up under "نوع دواء مسجل" (no
+    // filter) exactly as before, unaffected by the new KPI.
+    fireEvent.click(screen.getByRole("button", { name: /نوع دواء/ }));
+    expect(screen.getByText("دواء سليم المخزون")).toBeTruthy();
+  });
+});
+
 describe("navigation — سجل الصرف اليومي is a new tab, existing tabs are untouched", () => {
   it("the existing 'سجلّ الصرف' tab still opens (now showing the grouped-by-medication overview)", async () => {
     mockFetchAllWithdrawalLogs.mockResolvedValueOnce([

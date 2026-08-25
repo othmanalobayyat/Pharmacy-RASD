@@ -132,7 +132,7 @@ export function LogSection({ L, refreshSignal }) {
         />
       ) : (
         <div style={styles.logTableWrap}>
-          <table style={{ ...styles.logTable, minWidth: 0 }}>
+          <table className="log-main-table" style={{ ...styles.logTable, minWidth: 0 }}>
             <thead>
               <tr>
                 <th style={styles.th}>الدواء</th>
@@ -158,12 +158,18 @@ export function LogSection({ L, refreshSignal }) {
                         <button
                           type="button"
                           style={styles.logExpandBtn}
+                          aria-label={isOpen ? "إخفاء التفاصيل" : "عرض التفاصيل"}
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleExpanded(g.key);
                           }}
                         >
-                          {isOpen ? "إخفاء التفاصيل" : "عرض التفاصيل"}
+                          {/* Hidden (icon-only) on narrow phones via CSS —
+                              the button keeps its aria-label regardless, so
+                              the action stays accessible either way. */}
+                          <span className="log-expand-btn-label">
+                            {isOpen ? "إخفاء التفاصيل" : "عرض التفاصيل"}
+                          </span>
                           <ChevronDown
                             size={14}
                             style={{

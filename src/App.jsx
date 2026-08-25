@@ -6,6 +6,7 @@ import {
   Search,
   ShieldPlus,
   Layers,
+  PackageMinus,
   CalendarDays,
   Radar,
   Settings,
@@ -18,7 +19,7 @@ import "./styles/global.css";
 import { styles } from "./styles/styles";
 import { DEFAULT_LABELS } from "./constants";
 import { todayISO, daysUntilMonthEnd, isExpired, formatMonthYear } from "./lib/dates";
-import { urgency, medUrgency, medExpiredQty } from "./lib/medications";
+import { urgency, medUrgency, medExpiredQty, medAvailableQty } from "./lib/medications";
 import { useAuth } from "./hooks/useAuth";
 import { usePharmacyData } from "./hooks/usePharmacyData";
 import { hasLegacyData, hasMigrationRun } from "./lib/migrateLegacyData";
@@ -138,7 +139,7 @@ export default function PharmacyApp() {
   // KPI-card shortcuts (dashboard-only viewing state — never touches
   // pharmacy data itself, and is always resettable from existing UI: the
   // sidebar's "كل الأدوية" button, or the filter banner's own clear link).
-  const [medFilter, setMedFilter] = useState("all"); // "all" | "expired" | "critical"
+  const [medFilter, setMedFilter] = useState("all"); // "all" | "expired" | "critical" | "lowStock"
   const [firstAidFilter, setFirstAidFilter] = useState("all"); // "all" | "low"
   const [sessionDate, setSessionDate] = useState(todayISO());
   const [showSettings, setShowSettings] = useState(false);
@@ -208,6 +209,18 @@ export default function PharmacyApp() {
     m.batches.some(
       (b) => b.qty > 0 && urgency(daysUntilMonthEnd(b.expiry)) === "critical",
     );
+  // "قاربت الكمية على الانتهاء" — uses medAvailableQty(), the SAME single
+  // source of truth for withdrawable stock already used everywhere else
+  // (MedCard's "متوفر" number, the withdraw buttons' enable/disable
+  // condition, the Today view). Expired units never count as available, so
+  // a medication sitting on 20 expired + 4 valid units is "4 available" —
+  // included — while 0 valid + 10 expired is "0 available" — excluded, same
+  // as it already reads everywhere else in the app.
+  const LOW_STOCK_THRESHOLD = 5;
+  const medHasLowAvailableStock = (m) => {
+    const available = medAvailableQty(m);
+    return available > 0 && available < LOW_STOCK_THRESHOLD;
+  };
 
   const filteredMeds = state.medications.filter((m) => {
     const matchesCat =
@@ -218,7 +231,8 @@ export default function PharmacyApp() {
     const matchesKpiFilter =
       medFilter === "all" ||
       (medFilter === "expired" && medHasExpiredStock(m)) ||
-      (medFilter === "critical" && medHasCriticalStock(m));
+      (medFilter === "critical" && medHasCriticalStock(m)) ||
+      (medFilter === "lowStock" && medHasLowAvailableStock(m));
     return matchesCat && matchesSearch && matchesKpiFilter;
   });
   const sortedMeds = [...filteredMeds].sort((a, b) => {
@@ -236,6 +250,7 @@ export default function PharmacyApp() {
   const lowFirstAid = state.firstAid.filter(
     (f) => f.qty <= f.threshold,
   ).length;
+  const lowStockMedCount = state.medications.filter(medHasLowAvailableStock).length;
 
   const filteredFirstAid =
     firstAidFilter === "low"
@@ -263,6 +278,13 @@ export default function PharmacyApp() {
       empty: {
         title: "لا يوجد أدوية تنتهي قريبًا",
         subtitle: "لا يوجد حاليًا أي دواء تنتهي صلاحيته خلال أقل من شهر.",
+      },
+    },
+    lowStock: {
+      text: `عرض الأدوية التي قاربت الكمية المتوفرة منها على الانتهاء (أقل من ${LOW_STOCK_THRESHOLD} وحدات).`,
+      empty: {
+        title: "لا يوجد أدوية قاربت على النفاد",
+        subtitle: `لا يوجد حاليًا أي دواء بكمية متوفرة أقل من ${LOW_STOCK_THRESHOLD} وحدات.`,
       },
     },
   };
@@ -326,7 +348,7 @@ export default function PharmacyApp() {
             icon={<ShieldPlus size={16} />}
             value={lowFirstAid}
             label={L.kpiLowFirstAid}
-            tone="warning"
+            tone="info"
             onClick={() => {
               setActiveTab("firstaid");
               setFirstAidFilter("low");
@@ -338,6 +360,13 @@ export default function PharmacyApp() {
             label={L.kpiMedCount}
             tone="ok"
             onClick={() => goToMeds("all")}
+          />
+          <Kpi
+            icon={<PackageMinus size={16} />}
+            value={lowStockMedCount}
+            label={L.kpiLowStock}
+            tone="warning"
+            onClick={() => goToMeds("lowStock")}
           />
         </div>
       </header>

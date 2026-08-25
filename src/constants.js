@@ -13,6 +13,7 @@ export const DEFAULT_LABELS = {
   kpiCritical: "أقل من شهر",
   kpiLowFirstAid: "إسعافات ناقصة",
   kpiMedCount: "نوع دواء مسجّل",
+  kpiLowStock: "قاربت الكمية على الانتهاء",
   sidebarAll: "كل الأدوية",
   addCategoryBtn: "فئة جديدة",
   addMedBtn: "إضافة دواء",
@@ -41,6 +42,7 @@ export const LABEL_META = [
   ["kpiCritical", "مؤشر: أقل من شهر"],
   ["kpiLowFirstAid", "مؤشر: إسعافات ناقصة"],
   ["kpiMedCount", "مؤشر: عدد الأدوية"],
+  ["kpiLowStock", "مؤشر: قاربت الكمية على الانتهاء"],
   ["sidebarAll", "زر: كل الأدوية"],
   ["addCategoryBtn", "زر: فئة جديدة"],
   ["addMedBtn", "زر: إضافة دواء"],
@@ -62,4 +64,9 @@ export const URGENCY_STYLE = {
   critical: { bg: "#FBEEDD", fg: "#8A5417", bar: "#D98A3D" },
   warning: { bg: "#FFF7DE", fg: "#7A6416", bar: "#E0B23D" },
   ok: { bg: "#E7F3F1", fg: "#145C5C", bar: "#2E8B8B" },
+  // Distinct secondary tone (calm blue) — used where a warning-adjacent KPI
+  // needs to read as clearly different from the amber "warning" tone above
+  // (e.g. first-aid stock vs. low-medication-stock on the dashboard), while
+  // still fitting the app's existing cool teal/blue-leaning palette.
+  info: { bg: "#E8F1FB", fg: "#1B5FA8", bar: "#3B82C4" },
 };
