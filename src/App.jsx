@@ -36,6 +36,7 @@ import { MedCard } from "./components/MedCard";
 import { MedHistory } from "./components/MedHistory";
 import { FirstAidSection } from "./components/FirstAidSection";
 import { LogSection } from "./components/LogSection";
+import { DailyLogView } from "./components/DailyLogView";
 import { TodayView } from "./components/TodayView";
 import { Modal } from "./components/Modal";
 import { SimpleForm } from "./components/forms/SimpleForm";
@@ -365,6 +366,11 @@ export default function PharmacyApp() {
           onClick={() => setActiveTab("log")}
           label={L.tabLog}
         />
+        <TabButton
+          active={activeTab === "dailyLog"}
+          onClick={() => setActiveTab("dailyLog")}
+          label={L.tabDailyLog}
+        />
       </nav>
 
       <SaveIndicator status={cloudStatus} error={dataError} />
@@ -605,6 +611,8 @@ export default function PharmacyApp() {
           onLoadMore={loadMoreLog}
         />
       )}
+
+      {activeTab === "dailyLog" && <DailyLogView refreshSignal={logRefreshTick} />}
 
       {showSettings && isOwner && (
         <Modal title="الإعدادات" onClose={() => setShowSettings(false)} wide>

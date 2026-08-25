@@ -63,6 +63,11 @@ const mapLog = (r) => ({
   expiry: r.expiry,
   qty: r.qty,
   date: r.withdrawn_on,
+  // withdrawn_on is date-only (the business-meaningful field — see
+  // supabase/migrations/0001_schema.sql); created_at is the real timestamp,
+  // exposed only so the UI can show a time-of-day (e.g. the daily
+  // withdrawal log) without inventing information the schema doesn't have.
+  createdAt: r.created_at,
   performedByEmail: r.performed_by_email,
 });
 const mapProfile = (r) => ({
@@ -106,6 +111,24 @@ export async function fetchMedicationLog(medicationId) {
       .from("withdrawal_logs")
       .select("*")
       .eq("medication_id", medicationId)
+      .order("created_at", { ascending: false }),
+  );
+  return rows.map(mapLog);
+}
+
+// A single day's withdrawals (سجل الصرف اليومي), queried directly from the
+// database by the exact `withdrawn_on` date — not filtered out of the
+// paginated global log (see fetchWithdrawalLogPage above), which only ever
+// holds its most recent page and would silently show an empty/incomplete
+// day for any date older than what happens to be loaded. Already indexed
+// (withdrawal_logs_withdrawn_on_idx, supabase/migrations/0001_schema.sql),
+// so this needs no new migration.
+export async function fetchWithdrawalLogForDate(dateISO) {
+  const rows = await unwrap(
+    supabase
+      .from("withdrawal_logs")
+      .select("*")
+      .eq("withdrawn_on", dateISO)
       .order("created_at", { ascending: false }),
   );
   return rows.map(mapLog);

@@ -6,6 +6,18 @@ export const daysUntil = (isoDate) => {
   return Math.round((target - today) / (1000 * 60 * 60 * 24));
 };
 
+// Shifts an ISO date by `deltaDays` (may be negative) — used for the daily
+// withdrawal log's previous/next/today navigation. Built with Date.UTC (not
+// `new Date(y, m, d)`, which builds in local time) for the same reason
+// daysUntilMonthEnd() below is — correctness independent of the runtime's
+// timezone offset.
+export function addDays(isoDate, deltaDays) {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + deltaDays))
+    .toISOString()
+    .slice(0, 10);
+}
+
 export function daysAgoLabel(iso) {
   const d = daysUntil(iso);
   if (d === 0) return "اليوم";

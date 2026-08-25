@@ -7,7 +7,27 @@ import {
   monthInputToISO,
   isoToMonthInput,
   todayISO,
+  addDays,
 } from "./dates";
+
+describe("addDays() — used by the daily withdrawal log's prev/next/today navigation", () => {
+  it("moves forward by a positive delta", () => {
+    expect(addDays("2026-08-14", 1)).toBe("2026-08-15");
+  });
+  it("moves backward by a negative delta", () => {
+    expect(addDays("2026-08-14", -1)).toBe("2026-08-13");
+  });
+  it("correctly crosses a month boundary", () => {
+    expect(addDays("2026-08-31", 1)).toBe("2026-09-01");
+    expect(addDays("2026-09-01", -1)).toBe("2026-08-31");
+  });
+  it("correctly crosses a year boundary", () => {
+    expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
+  });
+  it("a delta of 0 returns the same date", () => {
+    expect(addDays("2026-08-14", 0)).toBe("2026-08-14");
+  });
+});
 
 describe("isExpired() — legacy day-based smoke test (uses real 'today')", () => {
   it("is true for a date in the past", () => {

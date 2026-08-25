@@ -9,9 +9,16 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 // feature actually changed.
 const mockUseAuth = vi.hoisted(() => vi.fn());
 const mockUsePharmacyData = vi.hoisted(() => vi.fn());
+// DailyLogView (سجل الصرف اليومي) self-fetches from pharmacyApi directly,
+// the same way MedHistory already does — mock just that one function so
+// mounting the tab in these tests never hits a real network call.
+const mockFetchWithdrawalLogForDate = vi.hoisted(() => vi.fn(() => new Promise(() => {})));
 
 vi.mock("./hooks/useAuth", () => ({ useAuth: mockUseAuth }));
 vi.mock("./hooks/usePharmacyData", () => ({ usePharmacyData: mockUsePharmacyData }));
+vi.mock("./lib/pharmacyApi", () => ({
+  fetchWithdrawalLogForDate: mockFetchWithdrawalLogForDate,
+}));
 
 const { default: PharmacyApp } = await import("./App");
 
@@ -183,5 +190,51 @@ describe("KPI cards — clickable dashboard shortcuts", () => {
     fireEvent.click(screen.getByRole("button", { name: /إسعافات ناقصة/ }));
 
     expect(screen.getByText("لا يوجد مواد إسعاف ناقصة")).toBeTruthy();
+  });
+});
+
+describe("navigation — سجل الصرف اليومي is a new tab, existing tabs are untouched", () => {
+  it("the existing 'سجلّ الصرف' tab still renders the global log exactly as before", () => {
+    mockUsePharmacyData.mockReturnValue(
+      pharmacyDataMock({
+        state: {
+          ...baseState,
+          log: [
+            {
+              id: "log-1",
+              medId: "m-ok",
+              medName: "دواء سليم المخزون",
+              batchId: "b3",
+              expiry: FAR_FUTURE_MONTH,
+              qty: 4,
+              date: "2026-08-10",
+              performedByEmail: "staff@clinic.test",
+            },
+          ],
+        },
+      }),
+    );
+    render(<PharmacyApp />);
+
+    fireEvent.click(screen.getByText("سجلّ الصرف"));
+
+    expect(screen.getByText("دواء سليم المخزون")).toBeTruthy();
+    expect(screen.getByText("staff@clinic.test")).toBeTruthy();
+  });
+
+  it("a new 'سجل الصرف اليومي' tab exists alongside الأدوية/الإسعافات الأولية/سجلّ الصرف and opens the daily view", () => {
+    render(<PharmacyApp />);
+
+    expect(screen.getByText("الأدوية")).toBeTruthy();
+    expect(screen.getByText("الإسعافات الأولية")).toBeTruthy();
+    expect(screen.getByText("سجلّ الصرف")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("سجل الصرف اليومي"));
+
+    // DailyLogView's own fetch never resolves in this test (see the mocked
+    // fetchWithdrawalLogForDate above) — asserting its loading state is
+    // proof the correct component actually mounted, not LogSection/MedCard.
+    expect(screen.getByText("جارٍ التحميل…")).toBeTruthy();
+    expect(mockFetchWithdrawalLogForDate).toHaveBeenCalled();
   });
 });
