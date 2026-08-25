@@ -42,6 +42,11 @@ button:focus-visible {
   transform: scale(0.98);
 }
 
+/* سجل الصرف grouped table — clickable row hover affordance. */
+.log-group-row:hover {
+  background: #f7faf9;
+}
+
 /* Dashboard header + KPI row responsive tightening (visual polish only —
    mirrors the existing inline-style-override-via-!important pattern used
    below for .pharmacy-body/.pharmacy-sidebar/.pharmacy-main). */

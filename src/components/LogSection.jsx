@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, History } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronDown, History } from "lucide-react";
 import { styles } from "../styles/styles";
 import { EmptyState } from "./EmptyState";
-import { Modal } from "./Modal";
 import { fetchAllWithdrawalLogs } from "../lib/pharmacyApi";
 import { formatFullDate, formatMonthYear } from "../lib/dates";
 
@@ -16,8 +15,11 @@ function formatTime(createdAt) {
 
 // "سجل الصرف" — the full withdrawal history, GROUPED BY MEDICATION so a
 // frequently-dispensed medication doesn't repeat itself as dozens of
-// separate rows. Each medication appears once, with a count; clicking it
-// opens every individual withdrawal record for that medication.
+// separate rows. Each medication appears once, as one row in a single data
+// table; clicking it expands an inline nested table with every individual
+// withdrawal record for that medication (no navigation, no modal — this is
+// a presentation-only redesign of the same grouped data the previous
+// card+modal version showed).
 //
 // This is a different screen from "سجل الصرف اليومي" (DailyLogView.jsx,
 // unchanged) — that one is a focused single-day view; this one is the full
@@ -33,7 +35,7 @@ function formatTime(createdAt) {
 export function LogSection({ L, refreshSignal }) {
   const [rows, setRows] = useState(null); // null = loading
   const [error, setError] = useState("");
-  const [selectedKey, setSelectedKey] = useState(null);
+  const [expandedKeys, setExpandedKeys] = useState(() => new Set());
 
   const load = useCallback(() => {
     setError("");
@@ -47,18 +49,20 @@ export function LogSection({ L, refreshSignal }) {
     load();
   }, [load, refreshSignal]);
 
-  // Grouped by medication identity: medication_id when the medication still
-  // exists, falling back to the snapshotted medication NAME only for rows
-  // whose medication was later deleted (medication_id is nullable — "on
-  // delete set null", see supabase/migrations/0001_schema.sql, so deleting
-  // a medication never destroys its withdrawal history). The "id:"/"name:"
-  // prefixes keep the two kinds of keys from ever colliding, so a deleted
-  // medication's history can never get merged into an unrelated LIVE
-  // medication that happens to share the same name.
+  // Grouping logic is UNCHANGED from the previous version — only how it's
+  // rendered below has changed. Grouped by medication identity:
+  // medication_id when the medication still exists, falling back to the
+  // snapshotted medication NAME only for rows whose medication was later
+  // deleted (medication_id is nullable — "on delete set null", see
+  // supabase/migrations/0001_schema.sql, so deleting a medication never
+  // destroys its withdrawal history). The "id:"/"name:" prefixes keep the
+  // two kinds of keys from ever colliding, so a deleted medication's
+  // history can never get merged into an unrelated LIVE medication that
+  // happens to share the same name.
   //
   // `rows` is already newest-first (fetchAllWithdrawalLogs orders by
   // created_at desc), so each group's `records` list is already
-  // newest-first too — no re-sort needed for the details view.
+  // newest-first too — no re-sort needed for the expanded details.
   const groups = useMemo(() => {
     if (!rows) return [];
     const map = new Map();
@@ -77,7 +81,14 @@ export function LogSection({ L, refreshSignal }) {
     return [...map.values()].sort((a, b) => ((a.lastAt || "") < (b.lastAt || "") ? 1 : -1));
   }, [rows]);
 
-  const selected = selectedKey ? groups.find((g) => g.key === selectedKey) : null;
+  const toggleExpanded = (key) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   return (
     <main className="pharmacy-main" style={{ ...styles.main, width: "100%" }}>
@@ -120,58 +131,94 @@ export function LogSection({ L, refreshSignal }) {
           subtitle="كل عملية صرف رح تنسجل هون تلقائيًا."
         />
       ) : (
-        <div style={styles.medGrid}>
-          {groups.map((g) => (
-            <button
-              key={g.key}
-              type="button"
-              className="kpi-card-clickable"
-              style={styles.logGroupCard}
-              onClick={() => setSelectedKey(g.key)}
-            >
-              <div style={styles.logGroupName}>{g.medName}</div>
-              <div style={styles.logGroupMeta}>عدد مرات الصرف: {g.count}</div>
-              <div style={styles.logGroupMeta}>إجمالي المصروف: {g.totalQty} وحدة</div>
-              <div style={styles.logGroupCta}>
-                اضغط لعرض التفاصيل <ChevronLeft size={13} />
-              </div>
-            </button>
-          ))}
+        <div style={styles.logTableWrap}>
+          <table style={{ ...styles.logTable, minWidth: 0 }}>
+            <thead>
+              <tr>
+                <th style={styles.th}>الدواء</th>
+                <th style={styles.th}>عدد مرات الصرف</th>
+                <th style={styles.th}>إجمالي الكمية المصروفة</th>
+                <th style={styles.th}>التفاصيل</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groups.map((g) => {
+                const isOpen = expandedKeys.has(g.key);
+                return (
+                  <Fragment key={g.key}>
+                    <tr
+                      className="log-group-row"
+                      style={styles.logGroupRow}
+                      onClick={() => toggleExpanded(g.key)}
+                    >
+                      <td style={{ ...styles.td, ...styles.logGroupNameCell }}>{g.medName}</td>
+                      <td style={styles.td}>{g.count}</td>
+                      <td style={styles.td}>{g.totalQty} وحدة</td>
+                      <td style={styles.td}>
+                        <button
+                          type="button"
+                          style={styles.logExpandBtn}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpanded(g.key);
+                          }}
+                        >
+                          {isOpen ? "إخفاء التفاصيل" : "عرض التفاصيل"}
+                          <ChevronDown
+                            size={14}
+                            style={{
+                              transform: isOpen ? "rotate(180deg)" : "none",
+                              transition: "transform 0.15s",
+                            }}
+                          />
+                        </button>
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr>
+                        <td colSpan={4} style={styles.logDetailsCell}>
+                          <div style={styles.logDetailsWrap}>
+                            <div style={styles.logDetailsTitle}>
+                              تفاصيل صرف {g.medName}
+                            </div>
+                            <div style={{ ...styles.logTableWrap, border: "1px solid #E4EEEC" }}>
+                              <table style={styles.logTable}>
+                                <thead>
+                                  <tr>
+                                    <th style={styles.th}>التاريخ</th>
+                                    <th style={styles.th}>الوقت</th>
+                                    <th style={styles.th}>الكمية</th>
+                                    <th style={styles.th}>تاريخ الانتهاء</th>
+                                    <th style={styles.th}>بواسطة</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {g.records.map((l) => (
+                                    <tr key={l.id}>
+                                      <td style={styles.td}>{formatFullDate(l.date)}</td>
+                                      <td style={styles.td}>{formatTime(l.createdAt) || "—"}</td>
+                                      <td style={styles.td}>{l.qty}</td>
+                                      <td style={styles.td}>
+                                        {l.expiry ? formatMonthYear(l.expiry) : "—"}
+                                      </td>
+                                      <td style={{ ...styles.td, color: "#7C918F" }}>
+                                        {l.performedByEmail || "—"}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-      )}
-
-      {selected && (
-        <Modal title={selected.medName} onClose={() => setSelectedKey(null)} wide>
-          <div style={{ fontSize: 12, color: "#7C918F", marginTop: -8, marginBottom: 12 }}>
-            تفاصيل عمليات الصرف
-          </div>
-          <div style={styles.logTableWrap}>
-            <table style={styles.logTable}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>التاريخ</th>
-                  <th style={styles.th}>الوقت</th>
-                  <th style={styles.th}>الكمية</th>
-                  <th style={styles.th}>تنتهي</th>
-                  <th style={styles.th}>بواسطة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selected.records.map((l) => (
-                  <tr key={l.id}>
-                    <td style={styles.td}>{formatFullDate(l.date)}</td>
-                    <td style={styles.td}>{formatTime(l.createdAt) || "—"}</td>
-                    <td style={styles.td}>{l.qty}</td>
-                    <td style={styles.td}>{l.expiry ? formatMonthYear(l.expiry) : "—"}</td>
-                    <td style={{ ...styles.td, color: "#7C918F" }}>
-                      {l.performedByEmail || "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Modal>
       )}
     </main>
   );

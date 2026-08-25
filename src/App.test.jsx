@@ -216,7 +216,13 @@ describe("navigation — سجل الصرف اليومي is a new tab, existing t
     fireEvent.click(screen.getByText("سجلّ الصرف"));
 
     expect(await screen.findByText("دواء سليم المخزون")).toBeTruthy();
-    expect(screen.getByText("عدد مرات الصرف: 1")).toBeTruthy();
+    // count now shows as its own table cell ("1"), not a combined label string
+    expect(
+      screen
+        .getByText("دواء سليم المخزون")
+        .closest("tr")
+        .textContent.includes("1"),
+    ).toBe(true);
   });
 
   it("a new 'سجل الصرف اليومي' tab exists alongside الأدوية/الإسعافات الأولية/سجلّ الصرف and opens the daily view", () => {

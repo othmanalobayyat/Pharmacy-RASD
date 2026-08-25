@@ -549,32 +549,48 @@ export const styles = {
     borderTop: "1px solid #EEF3F2",
     whiteSpace: "nowrap",
   },
-  // Grouped "سجل الصرف" overview — one card per medication. Sized/shaped
-  // like the existing medCard (same radius/border/padding) since it sits in
-  // the same medGrid layout as the Meds tab, just rendered as a <button>.
-  logGroupCard: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-    background: "#fff",
-    border: "1px solid #DCE8E6",
-    borderRadius: 14,
-    padding: 14,
-    textAlign: "right",
-    fontFamily: "inherit",
+  // Grouped "سجل الصرف" overview — one professional data table, one row per
+  // medication, with an inline-expandable nested table (not a modal, not a
+  // grid of floating cards).
+  logGroupRow: {
     cursor: "pointer",
-    width: "100%",
   },
-  logGroupName: { fontWeight: 800, fontSize: 15, wordBreak: "break-word" },
-  logGroupMeta: { fontSize: 12.5, color: "#5B6E6D" },
-  logGroupCta: {
+  logGroupNameCell: {
+    fontWeight: 800,
+    fontSize: 14,
+    color: "#1B2B2A",
+    wordBreak: "break-word",
+    whiteSpace: "normal",
+  },
+  logExpandBtn: {
     display: "flex",
     alignItems: "center",
     gap: 4,
-    fontSize: 11.5,
+    marginInlineStart: "auto",
+    border: "none",
+    background: "none",
     color: "#145C5C",
     fontWeight: 700,
-    marginTop: 4,
+    fontSize: 12.5,
+    fontFamily: "inherit",
+    cursor: "pointer",
+    padding: "4px 2px",
+    whiteSpace: "nowrap",
+  },
+  logDetailsCell: {
+    padding: "10px 14px 16px",
+    background: "#F7FAF9",
+    borderTop: "1px solid #EEF3F2",
+  },
+  logDetailsWrap: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  logDetailsTitle: {
+    fontSize: 12.5,
+    fontWeight: 700,
+    color: "#3A4E4C",
   },
   settingsSectionTitle: {
     fontWeight: 800,
