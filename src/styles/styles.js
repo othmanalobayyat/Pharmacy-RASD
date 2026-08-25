@@ -275,6 +275,8 @@ export const styles = {
     padding: "4px 8px",
     fontSize: 12.5,
     fontFamily: "inherit",
+    color: "#1B2B2A",
+    background: "#fff",
   },
   sessionHint: { fontSize: 10.5, color: "#B7C7C5" },
   searchBox: {
@@ -458,6 +460,11 @@ export const styles = {
     fontSize: 13.5,
     fontFamily: "inherit",
     color: "#1B2B2A",
+    // Explicit, so this never falls back to the browser's native dark-mode
+    // form-control background (which, combined with the explicit dark text
+    // color above, made fields unreadable — see src/index.css
+    // `color-scheme: light` for the other half of that fix).
+    background: "#fff",
     width: "100%",
   },
   selectWrap: { position: "relative" },
