@@ -19,7 +19,7 @@ import "./styles/global.css";
 import { styles } from "./styles/styles";
 import { DEFAULT_LABELS } from "./constants";
 import { todayISO, daysUntilMonthEnd, isExpired, formatMonthYear } from "./lib/dates";
-import { urgency, medUrgency } from "./lib/medications";
+import { urgency, medUrgency, medExpiredQty } from "./lib/medications";
 import { useAuth } from "./hooks/useAuth";
 import { usePharmacyData } from "./hooks/usePharmacyData";
 import { hasLegacyData, hasMigrationRun } from "./lib/migrateLegacyData";
@@ -137,6 +137,11 @@ export default function PharmacyApp() {
   const [activeTab, setActiveTab] = useState("meds");
   const [activeCategory, setActiveCategory] = useState("all");
   const [search, setSearch] = useState("");
+  // KPI-card shortcuts (dashboard-only viewing state — never touches
+  // pharmacy data itself, and is always resettable from existing UI: the
+  // sidebar's "كل الأدوية" button, or the filter banner's own clear link).
+  const [medFilter, setMedFilter] = useState("all"); // "all" | "expired" | "critical"
+  const [firstAidFilter, setFirstAidFilter] = useState("all"); // "all" | "low"
   const [sessionDate, setSessionDate] = useState(todayISO());
   const [showSettings, setShowSettings] = useState(false);
   const [migrationDismissed, setMigrationDismissed] = useState(false);
@@ -196,13 +201,27 @@ export default function PharmacyApp() {
     state.firstAid.length === 0;
 
   // ---- derived data ----
+  // Same medication-level conditions the "أقل من شهر" KPI's own batch-level
+  // count below is built from (urgency()/daysUntilMonthEnd()), just applied
+  // per-medication instead of per-batch, so a medication card shows up
+  // whenever ANY of its batches matches — no second expiry definition.
+  const medHasExpiredStock = (m) => medExpiredQty(m) > 0;
+  const medHasCriticalStock = (m) =>
+    m.batches.some(
+      (b) => b.qty > 0 && urgency(daysUntilMonthEnd(b.expiry)) === "critical",
+    );
+
   const filteredMeds = state.medications.filter((m) => {
     const matchesCat =
       activeCategory === "all" || m.categoryId === activeCategory;
     const matchesSearch = m.name
       .toLowerCase()
       .includes(search.trim().toLowerCase());
-    return matchesCat && matchesSearch;
+    const matchesKpiFilter =
+      medFilter === "all" ||
+      (medFilter === "expired" && medHasExpiredStock(m)) ||
+      (medFilter === "critical" && medHasCriticalStock(m));
+    return matchesCat && matchesSearch && matchesKpiFilter;
   });
   const sortedMeds = [...filteredMeds].sort((a, b) => {
     const order = { expired: 0, critical: 1, warning: 2, ok: 3, empty: 4 };
@@ -219,6 +238,36 @@ export default function PharmacyApp() {
   const lowFirstAid = state.firstAid.filter(
     (f) => f.qty <= f.threshold,
   ).length;
+
+  const filteredFirstAid =
+    firstAidFilter === "low"
+      ? state.firstAid.filter((f) => f.qty <= f.threshold)
+      : state.firstAid;
+
+  const goToMeds = (filter) => {
+    setActiveTab("meds");
+    setActiveCategory("all");
+    setSearch("");
+    setMedFilter(filter);
+  };
+  const clearMedFilter = () => setMedFilter("all");
+
+  const MED_FILTER_BANNER = {
+    expired: {
+      text: "عرض الأدوية التي تحتوي على مخزون منتهي الصلاحية فقط.",
+      empty: {
+        title: "لا يوجد أدوية منتهية الصلاحية",
+        subtitle: "لا يوجد حاليًا أي دواء يحتوي على مخزون منتهي الصلاحية.",
+      },
+    },
+    critical: {
+      text: "عرض الأدوية التي تنتهي صلاحيتها خلال أقل من شهر فقط.",
+      empty: {
+        title: "لا يوجد أدوية تنتهي قريبًا",
+        subtitle: "لا يوجد حاليًا أي دواء تنتهي صلاحيته خلال أقل من شهر.",
+      },
+    },
+  };
 
   // ---- render ----
   return (
@@ -266,24 +315,31 @@ export default function PharmacyApp() {
             value={expiredCount}
             label={L.kpiExpired}
             tone="expired"
+            onClick={() => goToMeds("expired")}
           />
           <Kpi
             icon={<Clock size={16} />}
             value={criticalCount}
             label={L.kpiCritical}
             tone="critical"
+            onClick={() => goToMeds("critical")}
           />
           <Kpi
             icon={<ShieldPlus size={16} />}
             value={lowFirstAid}
             label={L.kpiLowFirstAid}
             tone="warning"
+            onClick={() => {
+              setActiveTab("firstaid");
+              setFirstAidFilter("low");
+            }}
           />
           <Kpi
             icon={<Layers size={16} />}
             value={state.medications.length}
             label={L.kpiMedCount}
             tone="ok"
+            onClick={() => goToMeds("all")}
           />
         </div>
       </header>
@@ -340,7 +396,10 @@ export default function PharmacyApp() {
           <aside className="pharmacy-sidebar" style={styles.sidebar}>
             <button
               style={styles.sideItem(activeCategory === "all")}
-              onClick={() => setActiveCategory("all")}
+              onClick={() => {
+                setActiveCategory("all");
+                clearMedFilter();
+              }}
             >
               {L.sidebarAll}
               <span style={styles.countBadge}>{state.medications.length}</span>
@@ -384,6 +443,14 @@ export default function PharmacyApp() {
           </aside>
 
           <main className="pharmacy-main" style={styles.main}>
+            {medFilter !== "all" && (
+              <div style={styles.filterBanner}>
+                <span>{MED_FILTER_BANNER[medFilter].text}</span>
+                <button style={styles.filterBannerClear} onClick={clearMedFilter}>
+                  ✕ إلغاء التصفية — عرض كل الأدوية
+                </button>
+              </div>
+            )}
             <div style={styles.toolbar}>
               <div style={styles.searchBox}>
                 <Search size={16} color="#7C918F" />
@@ -423,12 +490,16 @@ export default function PharmacyApp() {
                 title={
                   state.medications.length === 0
                     ? L.emptyMedsTitle
-                    : "لا نتائج مطابقة"
+                    : medFilter !== "all"
+                      ? MED_FILTER_BANNER[medFilter].empty.title
+                      : "لا نتائج مطابقة"
                 }
                 subtitle={
                   state.medications.length === 0
                     ? L.emptyMedsSubtitle
-                    : "جرّب كلمة بحث أو فئة مختلفة."
+                    : medFilter !== "all"
+                      ? MED_FILTER_BANNER[medFilter].empty.subtitle
+                      : "جرّب كلمة بحث أو فئة مختلفة."
                 }
               />
             ) : (
@@ -483,22 +554,45 @@ export default function PharmacyApp() {
       )}
 
       {activeTab === "firstaid" && (
-        <FirstAidSection
-          L={L}
-          isOwner={isOwner}
-          items={state.firstAid}
-          onAdd={() => setShowAddFirstAid(true)}
-          onAdjust={adjustFirstAid}
-          onDelete={(id) => {
-            const item = state.firstAid.find((f) => f.id === id);
-            askConfirm(
-              "حذف مادة الإسعاف",
-              `هل أنت متأكد من حذف "${item?.name ?? ""}"؟ لا يمكن التراجع عن هذا الإجراء.`,
-              () => deleteFirstAid(id),
-            );
-          }}
-          onEdit={(item) => setEditFirstAidItem(item)}
-        />
+        <>
+          {firstAidFilter === "low" && (
+            <div style={{ ...styles.filterBanner, margin: "10px 12px 0" }}>
+              <span>عرض مواد الإسعافات الأولية الناقصة عن حد التنبيه فقط.</span>
+              <button
+                style={styles.filterBannerClear}
+                onClick={() => setFirstAidFilter("all")}
+              >
+                ✕ إلغاء التصفية — عرض كل المواد
+              </button>
+            </div>
+          )}
+
+          {firstAidFilter === "low" && filteredFirstAid.length === 0 ? (
+            <main className="pharmacy-main" style={{ ...styles.main, width: "100%" }}>
+              <EmptyState
+                title="لا يوجد مواد إسعاف ناقصة"
+                subtitle="جميع مواد الإسعافات الأولية أعلى من حد التنبيه حاليًا."
+              />
+            </main>
+          ) : (
+            <FirstAidSection
+              L={L}
+              isOwner={isOwner}
+              items={filteredFirstAid}
+              onAdd={() => setShowAddFirstAid(true)}
+              onAdjust={adjustFirstAid}
+              onDelete={(id) => {
+                const item = state.firstAid.find((f) => f.id === id);
+                askConfirm(
+                  "حذف مادة الإسعاف",
+                  `هل أنت متأكد من حذف "${item?.name ?? ""}"؟ لا يمكن التراجع عن هذا الإجراء.`,
+                  () => deleteFirstAid(id),
+                );
+              }}
+              onEdit={(item) => setEditFirstAidItem(item)}
+            />
+          )}
+        </>
       )}
 
       {activeTab === "log" && (

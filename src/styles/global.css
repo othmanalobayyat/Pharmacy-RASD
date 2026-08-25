@@ -32,6 +32,16 @@ button:focus-visible {
   }
 }
 
+/* KPI cards became clickable shortcuts — subtle affordance only, no
+   redesign. Keyboard focus-visible is already covered by the generic
+   `button:focus-visible` rule above since these render as real <button>s. */
+.kpi-card-clickable:hover {
+  filter: brightness(0.97);
+}
+.kpi-card-clickable:active {
+  transform: scale(0.98);
+}
+
 /* Dashboard header + KPI row responsive tightening (visual polish only —
    mirrors the existing inline-style-override-via-!important pattern used
    below for .pharmacy-body/.pharmacy-sidebar/.pharmacy-main). */

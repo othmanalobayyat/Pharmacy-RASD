@@ -108,6 +108,41 @@ export const styles = {
   },
   kpiValue: { fontSize: 18, fontWeight: 800, lineHeight: 1.15 },
   kpiLabel: { fontSize: 10.5, marginTop: 2, opacity: 0.92 },
+  // Button-reset so a KPI card rendered as a real <button> (see
+  // components/Kpi.jsx) looks pixel-identical to the plain-div version —
+  // hover/active/focus visuals live in global.css (.kpi-card-clickable).
+  kpiClickable: {
+    border: "none",
+    fontFamily: "inherit",
+    textAlign: "inherit",
+    width: "100%",
+    cursor: "pointer",
+  },
+  filterBanner: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    flexWrap: "wrap",
+    background: "#EAF1F0",
+    color: "#3A4E4C",
+    fontSize: 12.5,
+    fontWeight: 600,
+    padding: "8px 14px",
+    marginBottom: 12,
+    borderRadius: 10,
+  },
+  filterBannerClear: {
+    border: "none",
+    background: "none",
+    color: "#145C5C",
+    fontWeight: 700,
+    textDecoration: "underline",
+    cursor: "pointer",
+    fontSize: 12.5,
+    padding: 0,
+    fontFamily: "inherit",
+  },
   tabs: {
     display: "flex",
     gap: 4,
