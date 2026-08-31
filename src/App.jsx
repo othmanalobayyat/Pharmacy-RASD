@@ -20,6 +20,7 @@ import { styles } from "./styles/styles";
 import { DEFAULT_LABELS } from "./constants";
 import { todayISO, daysUntilMonthEnd, isExpired, formatMonthYear } from "./lib/dates";
 import { urgency, medUrgency, medExpiredQty, medAvailableQty } from "./lib/medications";
+import { formatSampleQty } from "./lib/format";
 import { useAuth } from "./hooks/useAuth";
 import { usePharmacyData } from "./hooks/usePharmacyData";
 import { hasLegacyData, hasMigrationRun } from "./lib/migrateLegacyData";
@@ -292,10 +293,10 @@ export default function PharmacyApp() {
       },
     },
     lowStock: {
-      text: `عرض الأدوية التي قاربت الكمية المتوفرة منها على الانتهاء (أقل من ${LOW_STOCK_THRESHOLD} وحدات).`,
+      text: `عرض الأدوية التي قاربت الكمية المتوفرة منها على الانتهاء (أقل من ${formatSampleQty(LOW_STOCK_THRESHOLD)}).`,
       empty: {
         title: "لا يوجد أدوية قاربت على النفاد",
-        subtitle: `لا يوجد حاليًا أي دواء بكمية متوفرة أقل من ${LOW_STOCK_THRESHOLD} وحدات.`,
+        subtitle: `لا يوجد حاليًا أي دواء بكمية متوفرة أقل من ${formatSampleQty(LOW_STOCK_THRESHOLD)}.`,
       },
     },
   };
@@ -545,7 +546,7 @@ export default function PharmacyApp() {
                       askConfirm(
                         "حذف الدفعة",
                         batch
-                          ? `هل أنت متأكد من حذف هذه الدفعة (${batch.qty} وحدة، تنتهي في ${formatMonthYear(batch.expiry)})؟ لا يمكن التراجع عن هذا الإجراء.`
+                          ? `هل أنت متأكد من حذف هذه الدفعة (${formatSampleQty(batch.qty)}، تنتهي في ${formatMonthYear(batch.expiry)})؟ لا يمكن التراجع عن هذا الإجراء.`
                           : "هل أنت متأكد من حذف هذه الدفعة؟ لا يمكن التراجع عن هذا الإجراء.",
                         () => deleteBatch(med.id, batchId),
                       );

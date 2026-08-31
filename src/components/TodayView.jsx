@@ -4,6 +4,7 @@ import { styles } from "../styles/styles";
 import { URGENCY_STYLE } from "../constants";
 import { formatMonthYear, isExpiringThisMonth } from "../lib/dates";
 import { medAvailableQty, medExpiredQty } from "../lib/medications";
+import { formatSampleQty } from "../lib/format";
 
 // Operational "what needs my attention today" screen — deliberately NOT a
 // replacement for the Meds tab (inventory management still happens there).
@@ -80,7 +81,7 @@ export function TodayView({ categories, medications, firstAid, onGoToMed, onGoTo
           <button key={med.id} type="button" style={styles.triageItem} onClick={() => onGoToMed(med)}>
             <span style={styles.triageItemName}>{med.name}</span>
             <span style={styles.triageItemMeta}>
-              {categoryName(med.categoryId)} · {expiredQty} وحدة منتهية
+              {categoryName(med.categoryId)} · {formatSampleQty(expiredQty)} منتهية
             </span>
           </button>
         )}

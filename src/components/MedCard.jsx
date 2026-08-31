@@ -3,6 +3,7 @@ import { styles } from "../styles/styles";
 import { URGENCY_STYLE } from "../constants";
 import { daysUntilMonthEnd, formatMonthYear } from "../lib/dates";
 import { medAvailableQty, medExpiredQty, urgency } from "../lib/medications";
+import { formatSampleQty } from "../lib/format";
 
 export function MedCard({
   med,
@@ -63,7 +64,7 @@ export function MedCard({
               ...(available === 0 ? styles.btnDisabled : {}),
             }}
             onClick={available > 0 ? onQuickWithdraw : undefined}
-            title="سحب حبة/وحدة واحدة بتاريخ اليوم المحدد أعلاه"
+            title="سحب حبة/عينة واحدة بتاريخ اليوم المحدد أعلاه"
           >
             <Minus size={15} />
           </button>
@@ -140,7 +141,7 @@ export function MedCard({
                       flexShrink: 0,
                     }}
                   />
-                  <span style={{ fontWeight: 700 }}>{b.qty} وحدة</span>
+                  <span style={{ fontWeight: 700 }}>{formatSampleQty(b.qty)}</span>
                   <span style={{ opacity: 0.85 }}>· ينتهي {formatMonthYear(b.expiry)}</span>
                   <span style={{ opacity: 0.85 }}>
                     · {d < 0 ? `منتهٍ منذ ${Math.abs(d)} يوم` : `بعد ${d} يوم`}

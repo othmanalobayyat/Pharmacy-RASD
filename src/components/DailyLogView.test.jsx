@@ -77,7 +77,7 @@ describe("DailyLogView — سجل الصرف اليومي", () => {
 
     await screen.findByText("بنادول");
     expect(screen.getByText("عدد عمليات الصرف").previousSibling.textContent).toBe("3");
-    expect(screen.getByText("إجمالي الوحدات المصروفة").previousSibling.textContent).toBe("8");
+    expect(screen.getByText("إجمالي العينات المصروفة").previousSibling.textContent).toBe("8");
   });
 
   it("changing the date updates the displayed records (old ones are cleared, not merged)", async () => {

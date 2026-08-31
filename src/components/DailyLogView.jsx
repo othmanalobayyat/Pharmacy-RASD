@@ -119,7 +119,7 @@ export function DailyLogView({ refreshSignal }) {
             </div>
             <div style={styles.historySummaryBox}>
               <div style={{ fontSize: 20, fontWeight: 800, color: "#145C5C" }}>{totalUnits}</div>
-              <div style={{ fontSize: 11.5, color: "#7C918F" }}>إجمالي الوحدات المصروفة</div>
+              <div style={{ fontSize: 11.5, color: "#7C918F" }}>إجمالي العينات المصروفة</div>
             </div>
           </div>
 

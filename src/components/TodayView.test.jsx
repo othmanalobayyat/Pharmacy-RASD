@@ -134,7 +134,7 @@ describe("TodayView — Today/Triage screen", () => {
     );
     // appears exactly once — in Expired only, not in low-stock (available=12>0)
     expect(screen.getAllByText("دواء مختلط").length).toBe(1);
-    expect(screen.getByText(/8 وحدة منتهية/)).toBeTruthy();
+    expect(screen.getByText(/8 عينات منتهية/)).toBeTruthy();
   });
 
   it("all-valid inventory renders every section's friendly empty state", () => {

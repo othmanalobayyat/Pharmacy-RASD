@@ -64,7 +64,7 @@ describe("LogSection — سجل الصرف: one table row per medication (groupe
     await screen.findByText("بنادول");
     const cells = within(mainRowFor("بنادول")).getAllByRole("cell");
     expect(cells[1].textContent).toBe("3"); // عدد مرات الصرف
-    expect(cells[2].textContent).toBe("8 وحدة"); // إجمالي الكمية المصروفة
+    expect(cells[2].textContent).toBe("8 عينات"); // إجمالي الكمية المصروفة
   });
 
   it("different medications remain separate rows", async () => {

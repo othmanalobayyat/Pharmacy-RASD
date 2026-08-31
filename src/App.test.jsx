@@ -229,7 +229,7 @@ describe("KPI cards — medFilter and firstAidFilter stay independent", () => {
     expect(screen.getByText("دواء قريب الانتهاء")).toBeTruthy();
     expect(screen.getByText("دواء سليم المخزون")).toBeTruthy();
     expect(
-      screen.queryByText("عرض الأدوية التي قاربت الكمية المتوفرة منها على الانتهاء (أقل من 5 وحدات).", {
+      screen.queryByText("عرض الأدوية التي قاربت الكمية المتوفرة منها على الانتهاء (أقل من 5 عينات).", {
         exact: false,
       }),
     ).toBeNull();

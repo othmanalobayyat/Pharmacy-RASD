@@ -4,6 +4,7 @@ import { styles } from "../styles/styles";
 import { EmptyState } from "./EmptyState";
 import { fetchAllWithdrawalLogs } from "../lib/pharmacyApi";
 import { formatFullDate, formatMonthYear } from "../lib/dates";
+import { formatSampleQty } from "../lib/format";
 
 function formatTime(createdAt) {
   if (!createdAt) return null;
@@ -153,7 +154,7 @@ export function LogSection({ L, refreshSignal }) {
                     >
                       <td style={{ ...styles.td, ...styles.logGroupNameCell }}>{g.medName}</td>
                       <td style={styles.td}>{g.count}</td>
-                      <td style={styles.td}>{g.totalQty} وحدة</td>
+                      <td style={styles.td}>{formatSampleQty(g.totalQty)}</td>
                       <td style={styles.td}>
                         <button
                           type="button"
