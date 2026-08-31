@@ -9,17 +9,14 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 // feature actually changed.
 const mockUseAuth = vi.hoisted(() => vi.fn());
 const mockUsePharmacyData = vi.hoisted(() => vi.fn());
-// DailyLogView (سجل الصرف اليومي) and LogSection (سجلّ الصرف, grouped) both
-// self-fetch from pharmacyApi directly, the same way MedHistory already
-// does — mock just those two functions so mounting either tab in these
-// tests never hits a real network call.
-const mockFetchWithdrawalLogForDate = vi.hoisted(() => vi.fn(() => new Promise(() => {})));
+// LogSection (سجلّ الصرف, grouped) self-fetches from pharmacyApi directly,
+// the same way MedHistory already does — mock it so mounting that tab in
+// these tests never hits a real network call.
 const mockFetchAllWithdrawalLogs = vi.hoisted(() => vi.fn(() => new Promise(() => {})));
 
 vi.mock("./hooks/useAuth", () => ({ useAuth: mockUseAuth }));
 vi.mock("./hooks/usePharmacyData", () => ({ usePharmacyData: mockUsePharmacyData }));
 vi.mock("./lib/pharmacyApi", () => ({
-  fetchWithdrawalLogForDate: mockFetchWithdrawalLogForDate,
   fetchAllWithdrawalLogs: mockFetchAllWithdrawalLogs,
 }));
 
@@ -494,8 +491,8 @@ describe("KPI — 'قاربت الكمية على الانتهاء' (available q
   });
 });
 
-describe("navigation — سجل الصرف اليومي is a new tab, existing tabs are untouched", () => {
-  it("the existing 'سجلّ الصرف' tab still opens (now showing the grouped-by-medication overview)", async () => {
+describe("navigation — سجل الصرف اليومي (Daily Withdrawal Log) has been removed; other tabs are untouched", () => {
+  it("the existing 'سجلّ الصرف' tab still opens (the grouped-by-medication overview)", async () => {
     mockFetchAllWithdrawalLogs.mockResolvedValueOnce([
       {
         id: "log-1",
@@ -523,19 +520,28 @@ describe("navigation — سجل الصرف اليومي is a new tab, existing t
     ).toBe(true);
   });
 
-  it("a new 'سجل الصرف اليومي' tab exists alongside الأدوية/الإسعافات الأولية/سجلّ الصرف and opens the daily view", () => {
+  it("'سجل الصرف اليومي' no longer exists as a tab, and the remaining tabs are all still present", () => {
     render(<PharmacyApp />);
 
+    expect(screen.queryByText("سجل الصرف اليومي")).toBeNull();
+
+    expect(screen.getByText("اليوم")).toBeTruthy();
     expect(screen.getByText("الأدوية")).toBeTruthy();
     expect(screen.getByText("الإسعافات الأولية")).toBeTruthy();
     expect(screen.getByText("سجلّ الصرف")).toBeTruthy();
+  });
 
-    fireEvent.click(screen.getByText("سجل الصرف اليومي"));
+  it("normal tab navigation (meds / first aid / log) still works with the daily-log tab gone", async () => {
+    mockFetchAllWithdrawalLogs.mockResolvedValueOnce([]);
+    render(<PharmacyApp />);
 
-    // DailyLogView's own fetch never resolves in this test (see the mocked
-    // fetchWithdrawalLogForDate above) — asserting its loading state is
-    // proof the correct component actually mounted, not LogSection/MedCard.
-    expect(screen.getByText("جارٍ التحميل…")).toBeTruthy();
-    expect(mockFetchWithdrawalLogForDate).toHaveBeenCalled();
+    fireEvent.click(screen.getByText("الإسعافات الأولية"));
+    expect(screen.getByText("شاش ناقص")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("الأدوية"));
+    expect(screen.getByText("كل الأدوية")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("سجلّ الصرف"));
+    await screen.findByText("لا توجد عمليات صرف مسجلة");
   });
 });

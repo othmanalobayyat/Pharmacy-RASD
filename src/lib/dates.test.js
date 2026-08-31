@@ -7,7 +7,6 @@ import {
   monthInputToISO,
   isoToMonthInput,
   todayISO,
-  addDays,
   formatFullDate,
 } from "./dates";
 
@@ -17,25 +16,6 @@ describe("formatFullDate() — for WITHDRAWAL date displays (day precision), nev
   });
   it("keeps a single-digit day/month zero-padded as stored", () => {
     expect(formatFullDate("2026-01-05")).toBe("05/01/2026");
-  });
-});
-
-describe("addDays() — used by the daily withdrawal log's prev/next/today navigation", () => {
-  it("moves forward by a positive delta", () => {
-    expect(addDays("2026-08-14", 1)).toBe("2026-08-15");
-  });
-  it("moves backward by a negative delta", () => {
-    expect(addDays("2026-08-14", -1)).toBe("2026-08-13");
-  });
-  it("correctly crosses a month boundary", () => {
-    expect(addDays("2026-08-31", 1)).toBe("2026-09-01");
-    expect(addDays("2026-09-01", -1)).toBe("2026-08-31");
-  });
-  it("correctly crosses a year boundary", () => {
-    expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
-  });
-  it("a delta of 0 returns the same date", () => {
-    expect(addDays("2026-08-14", 0)).toBe("2026-08-14");
   });
 });
 

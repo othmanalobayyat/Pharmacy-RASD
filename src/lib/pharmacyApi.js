@@ -134,24 +134,6 @@ export async function fetchMedicationLog(medicationId) {
   return rows.map(mapLog);
 }
 
-// A single day's withdrawals (سجل الصرف اليومي), queried directly from the
-// database by the exact `withdrawn_on` date — not filtered out of the
-// paginated global log (see fetchWithdrawalLogPage above), which only ever
-// holds its most recent page and would silently show an empty/incomplete
-// day for any date older than what happens to be loaded. Already indexed
-// (withdrawal_logs_withdrawn_on_idx, supabase/migrations/0001_schema.sql),
-// so this needs no new migration.
-export async function fetchWithdrawalLogForDate(dateISO) {
-  const rows = await unwrap(
-    supabase
-      .from("withdrawal_logs")
-      .select("*")
-      .eq("withdrawn_on", dateISO)
-      .order("created_at", { ascending: false }),
-  );
-  return rows.map(mapLog);
-}
-
 // ---------- full dataset load ----------
 // logLimit lets a refetch (after a mutation, or a realtime-triggered
 // refresh) re-request the same-sized log window the caller already had

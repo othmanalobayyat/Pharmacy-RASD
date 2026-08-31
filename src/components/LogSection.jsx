@@ -22,17 +22,13 @@ function formatTime(createdAt) {
 // a presentation-only redesign of the same grouped data the previous
 // card+modal version showed).
 //
-// This is a different screen from "سجل الصرف اليومي" (DailyLogView.jsx,
-// unchanged) — that one is a focused single-day view; this one is the full
-// history, just reorganized for readability.
-//
 // Self-fetches the full withdrawal_logs table (see
 // pharmacyApi.js fetchAllWithdrawalLogs for why an accurate per-medication
 // count needs every row, not the paginated global window), the same
-// self-fetch-a-scoped-dataset pattern MedHistory.jsx/DailyLogView.jsx
-// already use. `refreshSignal` (bumped by usePharmacyData on every load/
-// refetch, including realtime-triggered ones) re-triggers this fetch,
-// reusing the app's existing single Realtime subscription.
+// self-fetch-a-scoped-dataset pattern MedHistory.jsx already uses.
+// `refreshSignal` (bumped by usePharmacyData on every load/refetch,
+// including realtime-triggered ones) re-triggers this fetch, reusing the
+// app's existing single Realtime subscription.
 export function LogSection({ L, refreshSignal }) {
   const [rows, setRows] = useState(null); // null = loading
   const [error, setError] = useState("");

@@ -458,56 +458,6 @@ describe("fetchAllWithdrawalLogs() — used by the grouped سجل الصرف vie
   });
 });
 
-describe("fetchWithdrawalLogForDate() — سجل الصرف اليومي queries the database directly for the exact day", () => {
-  it("filters by withdrawn_on at the database level and maps every row, including createdAt for the time-of-day display", () => {
-    setChainResult([
-      {
-        id: "log-1",
-        medication_id: "med-1",
-        med_name: "بنادول",
-        batch_id: "batch-1",
-        expiry: "2026-01-01",
-        qty: 2,
-        withdrawn_on: "2026-08-20",
-        created_at: "2026-08-20T10:35:00.000Z",
-        performed_by_email: "staff@clinic.test",
-      },
-    ]);
-
-    return api.fetchWithdrawalLogForDate("2026-08-20").then((result) => {
-      expect(mockSupabase.from).toHaveBeenCalledWith("withdrawal_logs");
-      expect(chain.eq).toHaveBeenCalledWith("withdrawn_on", "2026-08-20");
-      expect(chain.order).toHaveBeenCalledWith("created_at", { ascending: false });
-      expect(result).toEqual([
-        {
-          id: "log-1",
-          medId: "med-1",
-          medName: "بنادول",
-          batchId: "batch-1",
-          expiry: "2026-01-01",
-          qty: 2,
-          date: "2026-08-20",
-          createdAt: "2026-08-20T10:35:00.000Z",
-          performedByEmail: "staff@clinic.test",
-        },
-      ]);
-    });
-  });
-
-  it("returns an empty array (not an error) for a day with no withdrawals", async () => {
-    setChainResult([]);
-    const result = await api.fetchWithdrawalLogForDate("2026-08-21");
-    expect(result).toEqual([]);
-  });
-
-  it("a failure fetching a day's log is mapped, not a raw Postgres error", async () => {
-    setChainResult(null, { message: "permission denied for table withdrawal_logs", code: "42501" });
-    await expect(api.fetchWithdrawalLogForDate("2026-08-20")).rejects.toThrow(
-      "⚠️ ليس لديك صلاحية لتنفيذ هذا الإجراء.",
-    );
-  });
-});
-
 describe("fetchMedicationLog() — a medication's own history is queried directly, not sliced from a cached page", () => {
   it("filters by medication_id at the database level and maps every row", async () => {
     setChainResult([
