@@ -265,6 +265,17 @@ export default function PharmacyApp() {
   };
   const clearMedFilter = () => setMedFilter("all");
 
+  // Mirrors goToMeds: navigates to First Aid and sets the independent
+  // firstAidFilter — and clears medFilter, since it lives in the same
+  // top-level state and is otherwise left stale from a previous med KPI
+  // click, which was the cause of the medication low-stock filter appearing
+  // to be "active" after visiting First Aid via its own KPI.
+  const goToFirstAid = (filter) => {
+    setActiveTab("firstaid");
+    setFirstAidFilter(filter);
+    setMedFilter("all");
+  };
+
   const MED_FILTER_BANNER = {
     expired: {
       text: "عرض الأدوية التي تحتوي على مخزون منتهي الصلاحية فقط.",
@@ -349,10 +360,7 @@ export default function PharmacyApp() {
             value={lowFirstAid}
             label={L.kpiLowFirstAid}
             tone="info"
-            onClick={() => {
-              setActiveTab("firstaid");
-              setFirstAidFilter("low");
-            }}
+            onClick={() => goToFirstAid("low")}
           />
           <Kpi
             icon={<Layers size={16} />}
@@ -379,12 +387,27 @@ export default function PharmacyApp() {
         />
         <TabButton
           active={activeTab === "meds"}
-          onClick={() => setActiveTab("meds")}
+          onClick={() => {
+            // Same normal-navigation-resets-the-KPI-filter rule as First
+            // Aid below — only goToMeds(filter) (a medication KPI click)
+            // may leave medFilter set to something other than "all".
+            setActiveTab("meds");
+            setMedFilter("all");
+          }}
           label={L.tabMeds}
         />
         <TabButton
           active={activeTab === "firstaid"}
-          onClick={() => setActiveTab("firstaid")}
+          onClick={() => {
+            // Normal tab navigation always resets to the default,
+            // unfiltered view — only goToFirstAid("low") (the KPI click)
+            // is allowed to leave firstAidFilter as "low". Without this,
+            // a filter set by the KPI silently survived leaving and
+            // returning to the tab, since firstAidFilter is otherwise
+            // untouched by tab switches.
+            setActiveTab("firstaid");
+            setFirstAidFilter("all");
+          }}
           label={L.tabFirstAid}
         />
         <TabButton

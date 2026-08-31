@@ -143,9 +143,11 @@ describe("KPI cards — clickable dashboard shortcuts", () => {
     expect(screen.queryByText("دواء سليم المخزون")).toBeNull();
   });
 
-  it("'إسعافات ناقصة' opens First Aid filtered to items at/below their threshold", () => {
+  it("'مواد إسعاف قاربت على الانتهاء' opens First Aid filtered to items at/below their threshold", () => {
     render(<PharmacyApp />);
-    fireEvent.click(screen.getByRole("button", { name: /إسعافات ناقصة/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /مواد إسعاف قاربت على الانتهاء/ }),
+    );
 
     expect(screen.getByText("شاش ناقص")).toBeTruthy();
     expect(screen.queryByText("ضمادات كافية")).toBeNull();
@@ -190,9 +192,187 @@ describe("KPI cards — clickable dashboard shortcuts", () => {
       pharmacyDataMock({ state: { ...baseState, firstAid: [firstAidOk] } }),
     );
     render(<PharmacyApp />);
-    fireEvent.click(screen.getByRole("button", { name: /إسعافات ناقصة/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /مواد إسعاف قاربت على الانتهاء/ }),
+    );
 
     expect(screen.getByText("لا يوجد مواد إسعاف ناقصة")).toBeTruthy();
+  });
+});
+
+describe("KPI cards — medFilter and firstAidFilter stay independent", () => {
+  it("clicking the first-aid KPI activates the first-aid low-stock filter, not the medication lowStock filter", () => {
+    render(<PharmacyApp />);
+    // starts on the default "meds" tab — sanity check before the click
+    expect(screen.getByText("كل الأدوية")).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /مواد إسعاف قاربت على الانتهاء/ }),
+    );
+
+    // navigated to First Aid (the medications sidebar is gone)...
+    expect(screen.queryByText("كل الأدوية")).toBeNull();
+    // ...the low-stock filter banner is actually rendered (proof
+    // firstAidFilter === "low" was really set, not just a lucky item match)...
+    expect(
+      screen.getByText("عرض مواد الإسعافات الأولية الناقصة عن حد التنبيه فقط."),
+    ).toBeTruthy();
+    // ...and only the low item is shown, the normal-stock item is not.
+    expect(screen.getByText("شاش ناقص")).toBeTruthy();
+    expect(screen.queryByText("ضمادات كافية")).toBeNull();
+
+    // switching over to Medications shows the FULL unfiltered list — proof
+    // that medFilter was never set to "lowStock" (or anything else) by the
+    // first-aid KPI click.
+    fireEvent.click(screen.getByText("الأدوية"));
+    expect(screen.getByText("دواء منتهي الصلاحية")).toBeTruthy();
+    expect(screen.getByText("دواء قريب الانتهاء")).toBeTruthy();
+    expect(screen.getByText("دواء سليم المخزون")).toBeTruthy();
+    expect(
+      screen.queryByText("عرض الأدوية التي قاربت الكمية المتوفرة منها على الانتهاء (أقل من 5 وحدات).", {
+        exact: false,
+      }),
+    ).toBeNull();
+  });
+
+  it("a medication filter left active before switching to First Aid is cleared once the first-aid KPI is clicked", () => {
+    render(<PharmacyApp />);
+    // activate a medication filter first
+    fireEvent.click(screen.getByRole("button", { name: /منتهية الصلاحية/ }));
+    expect(screen.queryByText("دواء سليم المخزون")).toBeNull();
+
+    // now use the first-aid KPI
+    fireEvent.click(
+      screen.getByRole("button", { name: /مواد إسعاف قاربت على الانتهاء/ }),
+    );
+
+    // back on Medications, the stale "expired" filter must be gone
+    fireEvent.click(screen.getByText("الأدوية"));
+    expect(screen.getByText("دواء منتهي الصلاحية")).toBeTruthy();
+    expect(screen.getByText("دواء قريب الانتهاء")).toBeTruthy();
+    expect(screen.getByText("دواء سليم المخزون")).toBeTruthy();
+  });
+
+  it("clicking the medication low-stock KPI does not activate the first-aid low-stock filter", () => {
+    mockUsePharmacyData.mockReturnValue(
+      pharmacyDataMock({
+        state: {
+          ...baseState,
+          medications: [
+            {
+              id: "m-low",
+              name: "دواء بوحدة واحدة",
+              categoryId: "cat1",
+              batches: [{ id: "b1", expiry: FAR_FUTURE_MONTH, qty: 1 }],
+            },
+          ],
+        },
+      }),
+    );
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByRole("button", { name: /قاربت الكمية على الانتهاء/ }));
+
+    // firstAidFilter must remain "all" — both items still show on First Aid
+    fireEvent.click(screen.getByText("الإسعافات الأولية"));
+    expect(screen.getByText("شاش ناقص")).toBeTruthy();
+    expect(screen.getByText("ضمادات كافية")).toBeTruthy();
+  });
+
+  it("the two KPI filters can never be restrictive at the same time", () => {
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByRole("button", { name: /منتهية الصلاحية/ })); // medFilter = "expired"
+    fireEvent.click(
+      screen.getByRole("button", { name: /مواد إسعاف قاربت على الانتهاء/ }),
+    ); // should reset medFilter to "all"
+
+    // First Aid is correctly filtered...
+    expect(screen.getByText("شاش ناقص")).toBeTruthy();
+    expect(screen.queryByText("ضمادات كافية")).toBeNull();
+    // ...and Medications is confirmed unfiltered (both cannot be
+    // simultaneously restrictive).
+    fireEvent.click(screen.getByText("الأدوية"));
+    expect(screen.getByText("دواء منتهي الصلاحية")).toBeTruthy();
+    expect(screen.getByText("دواء قريب الانتهاء")).toBeTruthy();
+    expect(screen.getByText("دواء سليم المخزون")).toBeTruthy();
+  });
+});
+
+describe("First Aid tab navigation vs. KPI navigation — filter lifecycle", () => {
+  const lowStockBanner = "عرض مواد الإسعافات الأولية الناقصة عن حد التنبيه فقط.";
+  const firstAidKpiButton = () =>
+    screen.getByRole("button", { name: /مواد إسعاف قاربت على الانتهاء/ });
+
+  it("Test 1 — normal First Aid tab navigation resets an active low-stock filter", () => {
+    render(<PharmacyApp />);
+    // reach firstAidFilter === "low" through the actual UI
+    fireEvent.click(firstAidKpiButton());
+    expect(screen.getByText(lowStockBanner)).toBeTruthy();
+
+    // leave, then use the NORMAL tab button (not the KPI) to come back
+    fireEvent.click(screen.getByText("الأدوية"));
+    fireEvent.click(screen.getByText("الإسعافات الأولية"));
+
+    expect(screen.queryByText(lowStockBanner)).toBeNull();
+    expect(screen.getByText("شاش ناقص")).toBeTruthy();
+    expect(screen.getByText("ضمادات كافية")).toBeTruthy();
+  });
+
+  it("Test 2 — the KPI still applies the low-stock filter on a fresh click", () => {
+    render(<PharmacyApp />);
+    fireEvent.click(firstAidKpiButton());
+
+    expect(screen.getByText(lowStockBanner)).toBeTruthy();
+    expect(screen.getByText("شاش ناقص")).toBeTruthy();
+    expect(screen.queryByText("ضمادات كافية")).toBeNull();
+  });
+
+  it("Test 3 — First Aid -> KPI -> another tab -> First Aid tab ends unfiltered", () => {
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByText("الإسعافات الأولية")); // start in First Aid normally
+    fireEvent.click(firstAidKpiButton()); // apply the low-stock filter
+    fireEvent.click(screen.getByText("الأدوية")); // leave
+    fireEvent.click(screen.getByText("الإسعافات الأولية")); // come back normally
+
+    expect(screen.queryByText(lowStockBanner)).toBeNull();
+    expect(screen.getByText("شاش ناقص")).toBeTruthy();
+    expect(screen.getByText("ضمادات كافية")).toBeTruthy();
+  });
+
+  it("Test 4 — clicking the First Aid tab again while already there (filter active) resets it", () => {
+    render(<PharmacyApp />);
+    fireEvent.click(firstAidKpiButton());
+    expect(screen.getByText(lowStockBanner)).toBeTruthy();
+
+    // same tab, clicked again, without leaving first
+    fireEvent.click(screen.getByText("الإسعافات الأولية"));
+
+    expect(screen.queryByText(lowStockBanner)).toBeNull();
+    expect(screen.getByText("شاش ناقص")).toBeTruthy();
+    expect(screen.getByText("ضمادات كافية")).toBeTruthy();
+  });
+
+  it("Test 5 — medication filtering stays independent through this whole lifecycle", () => {
+    render(<PharmacyApp />);
+    // normal navigation to meds never activates a medication KPI filter
+    fireEvent.click(screen.getByText("الأدوية"));
+    expect(screen.getByText("دواء منتهي الصلاحية")).toBeTruthy();
+    expect(screen.getByText("دواء قريب الانتهاء")).toBeTruthy();
+    expect(screen.getByText("دواء سليم المخزون")).toBeTruthy();
+
+    // the First Aid KPI/tab lifecycle above must never affect medFilter
+    fireEvent.click(firstAidKpiButton());
+    fireEvent.click(screen.getByText("الأدوية"));
+    expect(screen.getByText("دواء منتهي الصلاحية")).toBeTruthy();
+    expect(screen.getByText("دواء قريب الانتهاء")).toBeTruthy();
+    expect(screen.getByText("دواء سليم المخزون")).toBeTruthy();
+
+    // and a real medication KPI filter still works as before, independent
+    // of anything First Aid did
+    fireEvent.click(screen.getByRole("button", { name: /منتهية الصلاحية/ }));
+    expect(screen.queryByText("دواء سليم المخزون")).toBeNull();
+    fireEvent.click(screen.getByText("الإسعافات الأولية"));
+    expect(screen.getByText("شاش ناقص")).toBeTruthy();
+    expect(screen.getByText("ضمادات كافية")).toBeTruthy();
   });
 });
 

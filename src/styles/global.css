@@ -68,7 +68,7 @@ button:focus-visible {
   }
   /* 5 KPI cards, final approved mobile hierarchy:
      row 1 — FOUR small status cards, equal size/height: منتهية الصلاحية،
-             أقل من شهر، مواد الإسعاف على الرف، قاربت الكمية على الانتهاء
+             أقل من شهر، مواد إسعاف قاربت على الانتهاء، قاربت الكمية على الانتهاء
              (DOM order is 1,2,3,5 — nth-child(5) is pulled up next to the
              other three status cards via `order`, see below);
      row 2 — "الأدوية المسجلة" (nth-child 4) ALONE, full width — the one
