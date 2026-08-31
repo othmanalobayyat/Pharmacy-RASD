@@ -4,13 +4,21 @@ import { styles } from "../../styles/styles";
 
 export function AddMedForm({ categories, onSubmit, initial, submitLabel }) {
   const [name, setName] = useState(initial?.name || "");
-  const [categoryId, setCategoryId] = useState(
-    initial?.categoryId || categories[0]?.id || "",
-  );
+  // A NEW medication starts with no category — the user must explicitly
+  // choose one (never categories[0], which silently picked whichever
+  // category happened to sort first). Editing an existing medication still
+  // preserves its current category via `initial`.
+  const [categoryId, setCategoryId] = useState(initial?.categoryId || "");
+  const [submitted, setSubmitted] = useState(false);
+
+  const showCategoryError = submitted && !categoryId;
+
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
+        setSubmitted(true);
+        if (!name.trim() || !categoryId) return;
         onSubmit({ name, categoryId });
       }}
       style={styles.form}
@@ -32,6 +40,9 @@ export function AddMedForm({ categories, onSubmit, initial, submitLabel }) {
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
           >
+            <option value="" disabled>
+              اختر الفئة
+            </option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -40,6 +51,11 @@ export function AddMedForm({ categories, onSubmit, initial, submitLabel }) {
           </select>
           <ChevronDown size={15} style={styles.selectChevron} />
         </div>
+        {showCategoryError && (
+          <span style={{ color: "#9A2E23", fontSize: 12, fontWeight: 400 }}>
+            الرجاء اختيار الفئة.
+          </span>
+        )}
       </label>
       <button type="submit" style={styles.primaryBtn}>
         <Check size={16} /> {submitLabel || "إضافة الدواء"}
