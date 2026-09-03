@@ -7,6 +7,7 @@ import {
   medExpiredQty,
   medUrgency,
   withdrawableBatches,
+  sortMedicationsByName,
 } from "./medications";
 
 describe("urgency()", () => {
@@ -252,5 +253,95 @@ describe("medUrgency()", () => {
     const iso = farFuture.toISOString().slice(0, 10);
     const med = { batches: [{ expiry: iso, qty: 3 }] };
     expect(medUrgency(med)).toBe("ok");
+  });
+});
+
+describe("sortMedicationsByName() — alphabetical (A -> Z) medication list ordering", () => {
+  it("sorts by name, A -> Z", () => {
+    const meds = [
+      { id: "1", name: "Zinc", batches: [] },
+      { id: "2", name: "Amoxicillin", batches: [] },
+      { id: "3", name: "Metformin", batches: [] },
+    ];
+    expect(sortMedicationsByName(meds).map((m) => m.name)).toEqual([
+      "Amoxicillin",
+      "Metformin",
+      "Zinc",
+    ]);
+  });
+
+  it("is case-insensitive — mixed casing does not affect the order", () => {
+    const meds = [
+      { id: "1", name: "zinc", batches: [] },
+      { id: "2", name: "Amoxicillin", batches: [] },
+      { id: "3", name: "METFORMIN", batches: [] },
+      { id: "4", name: "amoxicillin drops", batches: [] },
+    ];
+    expect(sortMedicationsByName(meds).map((m) => m.name)).toEqual([
+      "Amoxicillin",
+      "amoxicillin drops",
+      "METFORMIN",
+      "zinc",
+    ]);
+  });
+
+  it("is deterministic for names that are equal case-insensitively (falls back to id, never input order)", () => {
+    const medsOrderA = [
+      { id: "b", name: "PANADOL", batches: [] },
+      { id: "a", name: "Panadol", batches: [] },
+    ];
+    const medsOrderB = [
+      { id: "a", name: "Panadol", batches: [] },
+      { id: "b", name: "PANADOL", batches: [] },
+    ];
+    // same result regardless of the input array's original order
+    expect(sortMedicationsByName(medsOrderA).map((m) => m.id)).toEqual(["a", "b"]);
+    expect(sortMedicationsByName(medsOrderB).map((m) => m.id)).toEqual(["a", "b"]);
+  });
+
+  it("ignores category, quantity, expiry, and batch data entirely — only name decides order", () => {
+    const meds = [
+      {
+        id: "1",
+        name: "Zinc",
+        categoryId: "cat-a",
+        createdAt: "2020-01-01",
+        batches: [{ id: "b1", expiry: "2020-01-01", qty: 999 }], // earliest-expiring, huge qty
+      },
+      {
+        id: "2",
+        name: "Amoxicillin",
+        categoryId: "cat-z",
+        createdAt: "2030-01-01",
+        batches: [{ id: "b2", expiry: "2030-01-01", qty: 0 }], // latest-expiring, zero qty
+      },
+    ];
+    // "Zinc" would sort last by category/expiry/qty/created-date under any
+    // of those criteria — name alone still puts "Amoxicillin" first.
+    expect(sortMedicationsByName(meds).map((m) => m.name)).toEqual(["Amoxicillin", "Zinc"]);
+  });
+
+  it("does not mutate the input array or its order", () => {
+    const meds = [
+      { id: "1", name: "Zinc", batches: [] },
+      { id: "2", name: "Amoxicillin", batches: [] },
+    ];
+    const original = [...meds];
+    const sorted = sortMedicationsByName(meds);
+
+    expect(meds).toEqual(original); // input untouched
+    expect(sorted).not.toBe(meds); // a new array was returned
+  });
+
+  it("leaves each medication's own batches array untouched — batch ordering inside a medication is not this function's concern", () => {
+    const batches = [
+      { id: "b-late", expiry: "2029-01-01", qty: 5 },
+      { id: "b-early", expiry: "2026-01-01", qty: 3 },
+    ];
+    const meds = [{ id: "1", name: "Zinc", batches }];
+    const [sortedMed] = sortMedicationsByName(meds);
+    // same array reference, same internal order — untouched
+    expect(sortedMed.batches).toBe(batches);
+    expect(sortedMed.batches.map((b) => b.id)).toEqual(["b-late", "b-early"]);
   });
 });

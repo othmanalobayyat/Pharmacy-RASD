@@ -20,7 +20,7 @@ import "./styles/global.css";
 import { styles } from "./styles/styles";
 import { DEFAULT_LABELS } from "./constants";
 import { todayISO, daysUntilMonthEnd, isExpired, formatMonthYear } from "./lib/dates";
-import { urgency, medUrgency, medExpiredQty, medAvailableQty } from "./lib/medications";
+import { urgency, medExpiredQty, medAvailableQty, sortMedicationsByName } from "./lib/medications";
 import { formatSampleQty } from "./lib/format";
 import { useAuth } from "./hooks/useAuth";
 import { usePharmacyData } from "./hooks/usePharmacyData";
@@ -240,10 +240,12 @@ export default function PharmacyApp() {
       (medFilter === "lowStock" && medHasLowAvailableStock(m));
     return matchesCat && matchesSearch && matchesKpiFilter;
   });
-  const sortedMeds = [...filteredMeds].sort((a, b) => {
-    const order = { expired: 0, critical: 1, warning: 2, ok: 3, empty: 4 };
-    return order[medUrgency(a)] - order[medUrgency(b)];
-  });
+  // Alphabetical (A -> Z, case-insensitive) by name — see
+  // lib/medications.js sortMedicationsByName() for why this replaced the
+  // previous urgency-based order. Applied AFTER category/search/KPI
+  // filtering, so none of that filtering logic is affected — only the
+  // final display order of whatever survived the filters above.
+  const sortedMeds = sortMedicationsByName(filteredMeds);
 
   const allBatches = state.medications.flatMap((m) => m.batches);
   const expiredCount = allBatches.filter(

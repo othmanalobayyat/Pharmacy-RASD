@@ -608,3 +608,186 @@ describe("navigation — Profile", () => {
     expect(screen.getByText("كل الأدوية")).toBeTruthy();
   });
 });
+
+describe("Medications tab — alphabetical (A -> Z) list ordering", () => {
+  // English names, deliberately not fetched/declared in alphabetical order
+  // below — the rendered order must come entirely from the app's own sort,
+  // never from fetch/array order.
+  const medZinc = {
+    id: "m-zinc",
+    name: "Zinc",
+    categoryId: "cat1",
+    batches: [{ id: "b-zinc", expiry: FAR_FUTURE_MONTH, qty: 5 }],
+  };
+  const medAmoxLower = {
+    id: "m-amox",
+    name: "amoxicillin", // lowercase, to prove case-insensitivity below
+    categoryId: "cat1",
+    batches: [{ id: "b-amox", expiry: FAR_FUTURE_MONTH, qty: 5 }],
+  };
+  const medMetformin = {
+    id: "m-met",
+    name: "Metformin",
+    categoryId: "cat1",
+    batches: [{ id: "b-met", expiry: FAR_FUTURE_MONTH, qty: 5 }],
+  };
+
+  it("renders medications A -> Z by name, case-insensitively, regardless of fetch order", () => {
+    mockUsePharmacyData.mockReturnValue(
+      pharmacyDataMock({
+        state: { ...baseState, medications: [medZinc, medMetformin, medAmoxLower] },
+      }),
+    );
+    render(<PharmacyApp />);
+
+    const text = document.body.textContent;
+    // lowercase "amoxicillin" still sorts before "Metformin" before "Zinc"
+    expect(text.indexOf("amoxicillin")).toBeLessThan(text.indexOf("Metformin"));
+    expect(text.indexOf("Metformin")).toBeLessThan(text.indexOf("Zinc"));
+  });
+
+  it("alphabetical ordering is preserved after searching", () => {
+    mockUsePharmacyData.mockReturnValue(
+      pharmacyDataMock({
+        state: { ...baseState, medications: [medZinc, medMetformin, medAmoxLower] },
+      }),
+    );
+    render(<PharmacyApp />);
+
+    // "m" matches "aMoxicillin" and "Metformin" (case-insensitive substring
+    // search), excluding "Zinc" — exercises search + sort together.
+    fireEvent.change(screen.getByPlaceholderText("ابحث عن دواء…"), {
+      target: { value: "m" },
+    });
+
+    expect(screen.getByText("amoxicillin")).toBeTruthy();
+    expect(screen.getByText("Metformin")).toBeTruthy();
+    expect(screen.queryByText("Zinc")).toBeNull();
+    const text = document.body.textContent;
+    expect(text.indexOf("amoxicillin")).toBeLessThan(text.indexOf("Metformin"));
+  });
+
+  it("alphabetical ordering is preserved under the 'قاربت الكمية على الانتهاء' (low-stock) KPI filter", () => {
+    const medZincLow = {
+      ...medZinc,
+      batches: [{ id: "b-zinc", expiry: FAR_FUTURE_MONTH, qty: 2 }], // < 5, included
+    };
+    const medMetLow = {
+      ...medMetformin,
+      batches: [{ id: "b-met", expiry: FAR_FUTURE_MONTH, qty: 3 }], // < 5, included
+    };
+    const medAmoxPlenty = {
+      ...medAmoxLower,
+      batches: [{ id: "b-amox", expiry: FAR_FUTURE_MONTH, qty: 50 }], // excluded
+    };
+    mockUsePharmacyData.mockReturnValue(
+      pharmacyDataMock({
+        state: { ...baseState, medications: [medZincLow, medMetLow, medAmoxPlenty] },
+      }),
+    );
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByRole("button", { name: /قاربت الكمية على الانتهاء/ }));
+
+    expect(screen.getByText("Metformin")).toBeTruthy();
+    expect(screen.getByText("Zinc")).toBeTruthy();
+    // filtered out — plenty of stock
+    expect(screen.queryByText("amoxicillin")).toBeNull();
+    const text = document.body.textContent;
+    expect(text.indexOf("Metformin")).toBeLessThan(text.indexOf("Zinc"));
+  });
+
+  it("alphabetical ordering is preserved under category filtering", () => {
+    const catA = { id: "cat-a", name: "فئة أ" };
+    const catB = { id: "cat-b", name: "فئة ب" };
+    const medInA1 = { ...medZinc, categoryId: "cat-a" };
+    const medInA2 = { ...medAmoxLower, categoryId: "cat-a" };
+    const medInB = { ...medMetformin, categoryId: "cat-b" };
+    mockUsePharmacyData.mockReturnValue(
+      pharmacyDataMock({
+        state: {
+          ...baseState,
+          categories: [catA, catB],
+          medications: [medInA1, medInB, medInA2],
+        },
+      }),
+    );
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByRole("button", { name: /^فئة أ/ }));
+
+    expect(screen.getByText("amoxicillin")).toBeTruthy();
+    expect(screen.getByText("Zinc")).toBeTruthy();
+    expect(screen.queryByText("Metformin")).toBeNull(); // different category
+    const text = document.body.textContent;
+    expect(text.indexOf("amoxicillin")).toBeLessThan(text.indexOf("Zinc"));
+  });
+
+  it("alphabetical ordering is preserved under the expired-stock KPI filter, and is not urgency-based", () => {
+    const medZincExpired = {
+      ...medZinc,
+      batches: [{ id: "b-zinc", expiry: LAST_MONTH, qty: 5 }], // expired
+    };
+    const medAmoxExpired = {
+      ...medAmoxLower,
+      batches: [{ id: "b-amox", expiry: LAST_MONTH, qty: 5 }], // expired, more urgent by no measure than the other — same bucket
+    };
+    mockUsePharmacyData.mockReturnValue(
+      pharmacyDataMock({
+        state: { ...baseState, medications: [medZincExpired, medAmoxExpired] },
+      }),
+    );
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByRole("button", { name: /منتهية الصلاحية/ }));
+
+    expect(screen.getByText("amoxicillin")).toBeTruthy();
+    expect(screen.getByText("Zinc")).toBeTruthy();
+    const text = document.body.textContent;
+    // alphabetical, not e.g. reverse-fetch-order or any urgency tie-break
+    expect(text.indexOf("amoxicillin")).toBeLessThan(text.indexOf("Zinc"));
+  });
+
+  it("does not reorder batches within a medication's own card (still earliest-expiry-first)", () => {
+    const laterMonth = monthISO(6);
+    const earlierMonth = FAR_FUTURE_MONTH; // monthISO(4) — earlier than monthISO(6)
+    const labelFor = (iso) => {
+      const [year, month] = iso.split("-");
+      return `${month}/${year}`;
+    };
+    const medMultiBatch = {
+      id: "m-multi",
+      name: "Multivitamin",
+      categoryId: "cat1",
+      // declared LATEST-expiry batch first, to prove the card doesn't just
+      // echo array order either — MedCard sorts its own batches by expiry.
+      batches: [
+        { id: "b-late", expiry: laterMonth, qty: 5 },
+        { id: "b-early", expiry: earlierMonth, qty: 3 },
+      ],
+    };
+    mockUsePharmacyData.mockReturnValue(
+      pharmacyDataMock({ state: { ...baseState, medications: [medMultiBatch] } }),
+    );
+    render(<PharmacyApp />);
+
+    const text = document.body.textContent;
+    expect(text.indexOf(labelFor(earlierMonth))).toBeLessThan(text.indexOf(labelFor(laterMonth)));
+  });
+
+  it("First Aid items are unaffected — still shown in their existing (non-alphabetical) order", () => {
+    const firstAidZ = { id: "f-z", name: "Zzz Item", qty: 1, threshold: 5 };
+    const firstAidA = { id: "f-a", name: "Aaa Item", qty: 1, threshold: 5 };
+    mockUsePharmacyData.mockReturnValue(
+      pharmacyDataMock({
+        state: { ...baseState, firstAid: [firstAidZ, firstAidA] },
+      }),
+    );
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByText("الإسعافات الأولية"));
+
+    expect(screen.getByText("Zzz Item")).toBeTruthy();
+    expect(screen.getByText("Aaa Item")).toBeTruthy();
+    // fetch order preserved — "Zzz Item" (declared/fetched first) still
+    // renders before "Aaa Item"; First Aid was never touched by this change
+    const text = document.body.textContent;
+    expect(text.indexOf("Zzz Item")).toBeLessThan(text.indexOf("Aaa Item"));
+  });
+});

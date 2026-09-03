@@ -57,6 +57,42 @@ export function medExpiredQty(med, referenceISO = todayISO()) {
     .reduce((sum, b) => sum + b.qty, 0);
 }
 
+// ---------- medication list ordering ----------
+//
+// The Medications tab's own display order — alphabetical by name (A -> Z),
+// case-insensitive, independent of category/quantity/expiry/batch/created
+// date. Deliberately NOT urgency-based (that used to be this list's order;
+// see git history) — this is purely a display convenience for finding a
+// medication by name, so it must never be affected by stock state.
+//
+// Comparison is a plain case-folded `<`/`>` on the name (not
+// String.prototype.localeCompare()) — deterministic across every JS engine
+// regardless of the runtime's ICU/locale data, and correct for the plain
+// English A-Z ordering this list is specified to use.
+function compareNamesCaseInsensitive(a, b) {
+  const an = a.toLowerCase();
+  const bn = b.toLowerCase();
+  if (an < bn) return -1;
+  if (an > bn) return 1;
+  return 0;
+}
+
+// Returns a NEW array — never mutates the input — sorted by med.name,
+// case-insensitive A -> Z. Names that are equal case-insensitively (e.g.
+// "Panadol" vs "PANADOL", or genuine duplicates) fall back to comparing
+// `id`, so the resulting order is fully deterministic and stable across
+// re-renders/re-fetches instead of depending on the input array's
+// (arbitrary, fetch-order-dependent) original ordering.
+export function sortMedicationsByName(medications) {
+  return [...medications].sort((a, b) => {
+    const byName = compareNamesCaseInsensitive(a.name, b.name);
+    if (byName !== 0) return byName;
+    if (a.id < b.id) return -1;
+    if (a.id > b.id) return 1;
+    return 0;
+  });
+}
+
 export function medUrgency(med) {
   const earliest = medEarliestBatch(med);
   if (!earliest) return "empty";
