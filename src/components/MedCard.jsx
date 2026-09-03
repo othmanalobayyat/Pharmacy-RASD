@@ -25,9 +25,13 @@ export function MedCard({
   const available = medAvailableQty(med);
   const expired = medExpiredQty(med);
   const total = available + expired;
-  const sortedBatches = [...med.batches].sort(
-    (a, b) => new Date(a.expiry) - new Date(b.expiry),
-  );
+  // Zero-quantity batches are real, retained records (traceability/history)
+  // but represent nothing physically on the shelf, so the shelf timeline —
+  // unlike the underlying med.batches data — only shows batches you could
+  // actually find here.
+  const sortedBatches = med.batches
+    .filter((b) => b.qty > 0)
+    .sort((a, b) => new Date(a.expiry) - new Date(b.expiry));
 
   return (
     <div style={styles.medCard}>

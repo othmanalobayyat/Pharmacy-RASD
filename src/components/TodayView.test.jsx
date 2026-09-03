@@ -53,6 +53,34 @@ describe("TodayView — Today/Triage screen", () => {
     expect(screen.getByText("لا يوجد أدوية تنتهي صلاحيتها هذا الشهر.")).toBeTruthy();
   });
 
+  it("an expired batch with qty = 0 does NOT put its medication in the 'Expired' section (it still legitimately shows as out-of-stock)", () => {
+    // The batch record itself is expired, but zero units physically exist —
+    // it must not be reported as expired stock. It's still correctly
+    // out-of-stock (available = 0), so it's expected in the low/out-of-stock
+    // section — this test isolates the Expired section specifically, the
+    // same way the "already-expired batch" test above does.
+    const medication = med({
+      id: "m-zero-qty-expired",
+      name: "دواء منتهي بكمية صفر",
+      batches: [{ id: "b1", expiry: LAST_MONTH, qty: 0 }],
+    });
+    render(
+      <TodayView
+        categories={categories}
+        medications={[medication]}
+        firstAid={[]}
+        onGoToMed={() => {}}
+        onGoToFirstAid={() => {}}
+      />,
+    );
+    // Expired section's own empty state is shown — the medication is not in it
+    expect(screen.getByText("لا يوجد أدوية منتهية الصلاحية حاليًا.")).toBeTruthy();
+    // appears exactly once overall — in low/out-of-stock only, not doubled
+    // into Expired the way a genuinely expired-with-stock medication would be
+    expect(screen.getAllByText("دواء منتهي بكمية صفر").length).toBe(1);
+    expect(screen.getByText(/لا يوجد كمية متاحة للصرف/)).toBeTruthy();
+  });
+
   it("a batch expiring THIS month puts its medication in 'Expiring This Month', not 'Expired'", () => {
     const medication = med({
       id: "m-this-month",

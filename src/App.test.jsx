@@ -57,6 +57,16 @@ const medOk = {
   categoryId: "cat1",
   batches: [{ id: "b3", expiry: FAR_FUTURE_MONTH, qty: 5 }],
 };
+// Only batch is expired but its quantity is 0 — physically nothing expired
+// stock is actually on the shelf, so it must not count as "expired stock"
+// anywhere, even though the batch record itself must still be retained
+// (traceability) rather than deleted.
+const medZeroQtyExpired = {
+  id: "m-zero-qty-expired",
+  name: "دواء منتهي بكمية صفر",
+  categoryId: "cat1",
+  batches: [{ id: "b-zero", expiry: LAST_MONTH, qty: 0 }],
+};
 
 const firstAidLow = { id: "f1", name: "شاش ناقص", qty: 1, threshold: 5 };
 const firstAidOk = { id: "f2", name: "ضمادات كافية", qty: 20, threshold: 5 };
@@ -129,6 +139,25 @@ describe("KPI cards — clickable dashboard shortcuts", () => {
     expect(
       screen.getByText("عرض الأدوية التي تحتوي على مخزون منتهي الصلاحية فقط."),
     ).toBeTruthy();
+  });
+
+  it("a medication whose only expired batch has qty = 0 is excluded from the expired KPI count and filter", () => {
+    mockUsePharmacyData.mockReturnValue(
+      pharmacyDataMock({
+        state: {
+          ...baseState,
+          medications: [medExpired, medZeroQtyExpired],
+        },
+      }),
+    );
+    render(<PharmacyApp />);
+    const kpiBtn = screen.getByRole("button", { name: /منتهية الصلاحية/ });
+    // count reflects only medExpired (qty=5) — the zero-qty batch adds nothing
+    expect(kpiBtn.getAttribute("aria-label")).toContain(": 1");
+
+    fireEvent.click(kpiBtn);
+    expect(screen.getByText("دواء منتهي الصلاحية")).toBeTruthy();
+    expect(screen.queryByText("دواء منتهي بكمية صفر")).toBeNull();
   });
 
   it("'أقل من شهر' opens Medications filtered to approaching-expiry stock, excluding already-expired medications", () => {
