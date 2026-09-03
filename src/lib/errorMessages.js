@@ -83,6 +83,10 @@ const PATTERN_MESSAGES = [
     re: /password.*(least|characters|weak)/i,
     message: "كلمة المرور غير كافية — يجب أن تتكون من 6 أحرف على الأقل.",
   },
+  {
+    re: /should be different from the old password/i,
+    message: "يجب أن تكون كلمة المرور الجديدة مختلفة عن كلمة المرور الحالية.",
+  },
 ];
 
 const GENERIC_FALLBACK =

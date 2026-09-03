@@ -13,6 +13,7 @@ import {
   LogOut,
   Eye,
   Unlock,
+  UserCircle,
 } from "lucide-react";
 
 import "./styles/global.css";
@@ -33,6 +34,7 @@ import { Kpi } from "./components/Kpi";
 import { TabButton } from "./components/TabButton";
 import { EmptyState } from "./components/EmptyState";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { ProfilePage } from "./components/profile/ProfilePage";
 import { CategorySidebar } from "./components/CategorySidebar";
 import { MedCard } from "./components/MedCard";
 import { MedHistory } from "./components/MedHistory";
@@ -103,6 +105,8 @@ export default function PharmacyApp() {
     signIn,
     signUp,
     signOut,
+    changePassword,
+    updateProfile,
   } = useAuth();
 
   const clinicId = profile?.clinicId ?? null;
@@ -143,6 +147,7 @@ export default function PharmacyApp() {
   const [firstAidFilter, setFirstAidFilter] = useState("all"); // "all" | "low"
   const [sessionDate, setSessionDate] = useState(todayISO());
   const [showSettings, setShowSettings] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [migrationDismissed, setMigrationDismissed] = useState(false);
 
   const [confirmState, setConfirmState] = useState(null);
@@ -322,6 +327,13 @@ export default function PharmacyApp() {
               </span>
               <span style={styles.roleTagEmail}>{user.email}</span>
             </span>
+            <button
+              style={styles.headerIconBtn}
+              onClick={() => setShowProfile(true)}
+              title="الملف الشخصي"
+            >
+              <UserCircle size={15} />
+            </button>
             {isAdmin && (
               <button
                 style={styles.headerIconBtn}
@@ -612,6 +624,17 @@ export default function PharmacyApp() {
       )}
 
       {activeTab === "log" && <LogSection L={L} refreshSignal={logRefreshTick} />}
+
+      {showProfile && (
+        <Modal title="الملف الشخصي" onClose={() => setShowProfile(false)} wide>
+          <ProfilePage
+            user={user}
+            profile={profile}
+            onChangePassword={changePassword}
+            onUpdateProfile={updateProfile}
+          />
+        </Modal>
+      )}
 
       {showSettings && isOwner && (
         <Modal title="الإعدادات" onClose={() => setShowSettings(false)} wide>

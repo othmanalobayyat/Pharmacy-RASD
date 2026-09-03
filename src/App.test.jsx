@@ -123,6 +123,8 @@ beforeEach(() => {
     signIn: vi.fn(),
     signUp: vi.fn(),
     signOut: vi.fn(),
+    changePassword: vi.fn(),
+    updateProfile: vi.fn().mockResolvedValue({}),
   });
   mockUsePharmacyData.mockReturnValue(pharmacyDataMock());
 });
@@ -572,5 +574,37 @@ describe("navigation — سجل الصرف اليومي (Daily Withdrawal Log) h
 
     fireEvent.click(screen.getByText("سجلّ الصرف"));
     await screen.findByText("لا توجد عمليات صرف مسجلة");
+  });
+});
+
+describe("navigation — Profile", () => {
+  it("the profile icon button opens the Profile modal for the currently signed-in user, for both admin and staff", () => {
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByTitle("الملف الشخصي"));
+
+    expect(screen.getByText("معلومات الحساب")).toBeTruthy();
+    // the authenticated user's own email, never another user's — shown once
+    // in the header (already there) and once in the new profile section
+    expect(screen.getAllByText("admin@clinic.test").length).toBe(2);
+    expect(screen.getByText("الأمان — تغيير كلمة المرور")).toBeTruthy();
+    expect(screen.getByText("فريق التطوير")).toBeTruthy();
+  });
+
+  it("closing the Profile modal returns to the previous screen without touching session/tab state", () => {
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByTitle("الملف الشخصي"));
+    expect(screen.getByText("معلومات الحساب")).toBeTruthy();
+
+    // Modal's own close (X) button lives in the modal header, alongside the
+    // modal's title span ("الملف الشخصي" — distinct from the header's own
+    // profile-icon button, which carries that text as its `title` attribute
+    // rather than visible text).
+    const modalTitle = screen.getByText("الملف الشخصي", { selector: "span" });
+    const closeBtn = modalTitle.parentElement.querySelector("button");
+    fireEvent.click(closeBtn);
+
+    expect(screen.queryByText("معلومات الحساب")).toBeNull();
+    // still on the same dashboard, still signed in
+    expect(screen.getByText("كل الأدوية")).toBeTruthy();
   });
 });

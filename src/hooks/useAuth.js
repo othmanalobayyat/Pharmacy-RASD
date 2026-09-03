@@ -103,10 +103,36 @@ export function useAuth() {
     await auth.signOut();
   }, []);
 
+  const user = session?.user ?? null;
+
+  // Deliberately does NOT touch authError/session — this is a Profile-page
+  // action, not part of the sign-in/sign-out lifecycle, so its errors stay
+  // local to whichever form calls it (see ProfilePage/ChangePasswordForm).
+  const changePassword = useCallback(
+    async (currentPassword, newPassword) => {
+      if (!user?.email) {
+        throw new Error("تعذر تحديد الحساب الحالي. يرجى تسجيل الدخول مرة أخرى.");
+      }
+      await auth.changePassword(user.email, currentPassword, newPassword);
+    },
+    [user],
+  );
+
+  // Updates full_name/job_title for the CURRENT user only (see
+  // update_own_profile() in supabase/migrations/0017_profile_full_name_job_title.sql,
+  // which scopes the write to auth.uid() server-side). Refreshes local
+  // `profile` state from the RPC's own return value so the Profile page
+  // reflects the save immediately, without a second fetchProfile() round trip.
+  const updateProfile = useCallback(async (fullName, jobTitle) => {
+    const updated = await auth.updateOwnProfile(fullName, jobTitle);
+    setProfile(updated);
+    return updated;
+  }, []);
+
   return {
     configured: isSupabaseConfigured,
     session,
-    user: session?.user ?? null,
+    user,
     profile,
     isAdmin: profile?.role === "admin",
     loading,
@@ -114,5 +140,7 @@ export function useAuth() {
     signIn,
     signUp,
     signOut,
+    changePassword,
+    updateProfile,
   };
 }
