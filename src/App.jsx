@@ -14,6 +14,7 @@ import {
   Eye,
   Unlock,
   UserCircle,
+  Download,
 } from "lucide-react";
 
 import "./styles/global.css";
@@ -35,6 +36,7 @@ import { TabButton } from "./components/TabButton";
 import { EmptyState } from "./components/EmptyState";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { ProfilePage } from "./components/profile/ProfilePage";
+import { ExportMedsForm } from "./components/export/ExportMedsForm";
 import { CategorySidebar } from "./components/CategorySidebar";
 import { MedCard } from "./components/MedCard";
 import { MedHistory } from "./components/MedHistory";
@@ -148,6 +150,8 @@ export default function PharmacyApp() {
   const [sessionDate, setSessionDate] = useState(todayISO());
   const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [exportSuccessFlash, setExportSuccessFlash] = useState("");
   const [migrationDismissed, setMigrationDismissed] = useState(false);
 
   const [confirmState, setConfirmState] = useState(null);
@@ -246,6 +250,13 @@ export default function PharmacyApp() {
   // filtering, so none of that filtering logic is affected — only the
   // final display order of whatever survived the filters above.
   const sortedMeds = sortMedicationsByName(filteredMeds);
+  // Full clinic inventory, A -> Z, deliberately bypassing
+  // activeCategory/search/medFilter entirely — the Data Sharing export must
+  // always cover every medication regardless of what's currently on screen
+  // (see ExportMedsForm below). state.medications is already fully loaded
+  // by usePharmacyData, so this is just a re-sort of data already in
+  // memory, not a second fetch.
+  const exportableMeds = sortMedicationsByName(state.medications);
 
   const allBatches = state.medications.flatMap((m) => m.batches);
   const expiredCount = allBatches.filter(
@@ -432,6 +443,9 @@ export default function PharmacyApp() {
       </nav>
 
       <SaveIndicator status={cloudStatus} error={dataError} />
+      {exportSuccessFlash && (
+        <div style={styles.exportSuccessFlash}>{exportSuccessFlash}</div>
+      )}
 
       {showMigrationPrompt && (
         <MigrationPrompt
@@ -491,6 +505,13 @@ export default function PharmacyApp() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              <button
+                type="button"
+                style={{ ...styles.secondaryBtn, flex: "none", whiteSpace: "nowrap" }}
+                onClick={() => setShowExport(true)}
+              >
+                <Download size={14} /> مشاركة البيانات
+              </button>
               {isOwner && (
                 <button
                   style={styles.primaryBtn}
@@ -634,6 +655,21 @@ export default function PharmacyApp() {
             profile={profile}
             onChangePassword={changePassword}
             onUpdateProfile={updateProfile}
+          />
+        </Modal>
+      )}
+
+      {showExport && (
+        <Modal title="تصدير مخزون الأدوية" onClose={() => setShowExport(false)}>
+          <ExportMedsForm
+            medications={exportableMeds}
+            categories={state.categories}
+            onCancel={() => setShowExport(false)}
+            onExported={() => {
+              setShowExport(false);
+              setExportSuccessFlash("تم تنزيل ملف تصدير المخزون بنجاح.");
+              setTimeout(() => setExportSuccessFlash(""), 2500);
+            }}
           />
         </Modal>
       )}

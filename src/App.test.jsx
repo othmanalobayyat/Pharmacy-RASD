@@ -13,12 +13,22 @@ const mockUsePharmacyData = vi.hoisted(() => vi.fn());
 // the same way MedHistory already does — mock it so mounting that tab in
 // these tests never hits a real network call.
 const mockFetchAllWithdrawalLogs = vi.hoisted(() => vi.fn(() => new Promise(() => {})));
+// downloadCsvFile is the only DOM-touching piece of the export feature
+// (Blob + <a download>, unsupported in jsdom) — mocked so mounting/using the
+// Data Sharing modal here never hits real browser download APIs. The real
+// buildExportTable()/rowsToCsv() still run (see importOriginal below), so
+// these tests exercise real column-selection/data logic end to end.
+const mockDownloadCsvFile = vi.hoisted(() => vi.fn());
 
 vi.mock("./hooks/useAuth", () => ({ useAuth: mockUseAuth }));
 vi.mock("./hooks/usePharmacyData", () => ({ usePharmacyData: mockUsePharmacyData }));
 vi.mock("./lib/pharmacyApi", () => ({
   fetchAllWithdrawalLogs: mockFetchAllWithdrawalLogs,
 }));
+vi.mock("./lib/exportMedications", async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, downloadCsvFile: mockDownloadCsvFile };
+});
 
 const { default: PharmacyApp } = await import("./App");
 
@@ -789,5 +799,139 @@ describe("Medications tab — alphabetical (A -> Z) list ordering", () => {
     // renders before "Aaa Item"; First Aid was never touched by this change
     const text = document.body.textContent;
     expect(text.indexOf("Zzz Item")).toBeLessThan(text.indexOf("Aaa Item"));
+  });
+});
+
+describe("Data Sharing / Excel export", () => {
+  beforeEach(() => mockDownloadCsvFile.mockClear());
+
+  it("clicking 'مشاركة البيانات' opens the export column-selection modal, with Medication Name locked on", () => {
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByRole("button", { name: /مشاركة البيانات/ }));
+
+    expect(screen.getByText("تصدير مخزون الأدوية")).toBeTruthy();
+    const nameCheckbox = screen.getByRole("checkbox", { name: /اسم الدواء/ });
+    expect(nameCheckbox.checked).toBe(true);
+    expect(nameCheckbox.disabled).toBe(true);
+  });
+
+  it("exports the COMPLETE medication inventory even while a KPI filter (e.g. 'منتهية الصلاحية') is active", () => {
+    render(<PharmacyApp />);
+    // filter down to the expired-only medication first — on-screen view is
+    // now just medExpired, but the export must still cover all three.
+    fireEvent.click(screen.getByRole("button", { name: /منتهية الصلاحية/ }));
+    expect(screen.queryByText("دواء سليم المخزون")).toBeNull(); // on-screen filter is in effect
+
+    fireEvent.click(screen.getByRole("button", { name: /مشاركة البيانات/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^تصدير/ }));
+
+    expect(mockDownloadCsvFile).toHaveBeenCalledTimes(1);
+    const [, csv] = mockDownloadCsvFile.mock.calls[0];
+    expect(csv).toContain("دواء منتهي الصلاحية");
+    expect(csv).toContain("دواء قريب الانتهاء");
+    expect(csv).toContain("دواء سليم المخزون");
+    // on-screen filtered view is unchanged by the export itself
+    expect(screen.queryByText("دواء سليم المخزون")).toBeNull();
+  });
+
+  it("exports the COMPLETE inventory even while a search query is active", () => {
+    render(<PharmacyApp />);
+    fireEvent.change(screen.getByPlaceholderText("ابحث عن دواء…"), {
+      target: { value: "قريب" },
+    });
+    expect(screen.queryByText("دواء منتهي الصلاحية")).toBeNull(); // on-screen filter is in effect
+
+    fireEvent.click(screen.getByRole("button", { name: /مشاركة البيانات/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^تصدير/ }));
+
+    const [, csv] = mockDownloadCsvFile.mock.calls[0];
+    expect(csv).toContain("دواء منتهي الصلاحية");
+    expect(csv).toContain("دواء قريب الانتهاء");
+    expect(csv).toContain("دواء سليم المخزون");
+  });
+
+  it("exports the COMPLETE inventory even while a category filter is active, and preserves A -> Z export order", () => {
+    const catA = { id: "cat-a", name: "فئة أ" };
+    const catB = { id: "cat-b", name: "فئة ب" };
+    const medZ = { id: "m-z", name: "Zinc", categoryId: "cat-a", batches: [] };
+    const medA = { id: "m-a", name: "Amoxicillin", categoryId: "cat-b", batches: [] };
+    mockUsePharmacyData.mockReturnValue(
+      pharmacyDataMock({
+        state: { ...baseState, categories: [catA, catB], medications: [medZ, medA] },
+      }),
+    );
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByRole("button", { name: /^فئة أ/ }));
+    expect(screen.queryByText("Amoxicillin")).toBeNull(); // on-screen filter is in effect
+
+    fireEvent.click(screen.getByRole("button", { name: /مشاركة البيانات/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^تصدير/ }));
+
+    const [, csv] = mockDownloadCsvFile.mock.calls[0];
+    const nameLines = csv.split("\r\n").slice(1); // drop header row
+    expect(nameLines).toEqual(["Amoxicillin", "Zinc"]); // both meds, A -> Z, despite the category filter
+  });
+
+  it("column-selection behavior is unchanged: only the checked optional columns appear, in the fixed order", () => {
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByRole("button", { name: /مشاركة البيانات/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /حالة المخزون/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /الفئة/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^تصدير/ }));
+
+    const [, csv] = mockDownloadCsvFile.mock.calls[0];
+    expect(csv.split("\r\n")[0]).toBe("اسم الدواء,الفئة,حالة المخزون");
+  });
+
+  it("after a successful export, the modal closes and the existing success-feedback pattern is shown", () => {
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByRole("button", { name: /مشاركة البيانات/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^تصدير/ }));
+
+    expect(screen.queryByText("تصدير مخزون الأدوية")).toBeNull(); // modal closed
+    expect(screen.getByText("تم تنزيل ملف تصدير المخزون بنجاح.")).toBeTruthy();
+  });
+
+  it("Cancel closes the modal without exporting, and does not navigate away from the current tab", () => {
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByRole("button", { name: /مشاركة البيانات/ }));
+    fireEvent.click(screen.getByRole("button", { name: /إلغاء/ }));
+
+    expect(screen.queryByText("تصدير مخزون الأدوية")).toBeNull();
+    expect(mockDownloadCsvFile).not.toHaveBeenCalled();
+    // still on the Medications tab
+    expect(screen.getByText("كل الأدوية")).toBeTruthy();
+  });
+
+  it("export is purely client-side: no pharmacy-data mutation function is called during export", () => {
+    const dataMock = pharmacyDataMock();
+    mockUsePharmacyData.mockReturnValue(dataMock);
+    render(<PharmacyApp />);
+    fireEvent.click(screen.getByRole("button", { name: /مشاركة البيانات/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^تصدير/ }));
+
+    // none of the CRUD/mutation functions the app has access to were touched
+    for (const fn of [
+      dataMock.addMedication,
+      dataMock.editMedication,
+      dataMock.deleteMedication,
+      dataMock.addBatch,
+      dataMock.deleteBatch,
+      dataMock.adjustBatchQty,
+      dataMock.withdrawStock,
+      dataMock.refetch,
+    ]) {
+      expect(fn).not.toHaveBeenCalled();
+    }
+  });
+
+  it("existing Medications tab/dashboard behavior (KPIs, search, filters) is unaffected by the export feature", () => {
+    render(<PharmacyApp />);
+    expect(screen.getByText("دواء منتهي الصلاحية")).toBeTruthy();
+    expect(screen.getByText("دواء قريب الانتهاء")).toBeTruthy();
+    expect(screen.getByText("دواء سليم المخزون")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /أقل من شهر/ }));
+    expect(screen.getByText("دواء قريب الانتهاء")).toBeTruthy();
+    expect(screen.queryByText("دواء منتهي الصلاحية")).toBeNull();
   });
 });

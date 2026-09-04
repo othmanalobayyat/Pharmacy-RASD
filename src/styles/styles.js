@@ -1045,4 +1045,53 @@ export const styles = {
     color: "#3A4E4C",
     lineHeight: 1.6,
   },
+
+  // ---------------------------------------------------------------------
+  // Data Sharing / medication export — column-selection checklist.
+  // Reuses the existing form/label/button language (styles.form,
+  // styles.label, styles.primaryBtn/secondaryBtn) rather than introducing a
+  // new visual pattern; only the checkbox row itself is new.
+  // ---------------------------------------------------------------------
+  exportIntro: { fontSize: 12.5, color: "#5B6E6D", lineHeight: 1.7 },
+  exportFieldsList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    border: "1px solid #E4EEEC",
+    borderRadius: 10,
+    padding: "4px 10px",
+  },
+  exportFieldRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 9,
+    padding: "9px 2px",
+    fontSize: 13,
+    color: "#1B2B2A",
+    cursor: "pointer",
+    borderBottom: "1px solid #F1F6F5",
+  },
+  exportFieldRowLast: { borderBottom: "none" },
+  exportFieldCheckbox: { width: 16, height: 16, accentColor: "#145C5C", flexShrink: 0 },
+  exportFieldRequiredTag: {
+    marginInlineStart: "auto",
+    fontSize: 10.5,
+    fontWeight: 700,
+    color: "#145C5C",
+    background: "#E7F3F1",
+    borderRadius: 999,
+    padding: "2px 8px",
+    flexShrink: 0,
+  },
+  exportEmptyNote: { fontSize: 12, color: "#9A2E23" },
+  exportSuccessFlash: {
+    margin: "0 12px",
+    color: "#145C5C",
+    background: "#E7F3F1",
+    border: "1px solid #CFE4E1",
+    borderRadius: 10,
+    padding: "9px 12px",
+    fontSize: 12.5,
+    fontWeight: 700,
+  },
 };
